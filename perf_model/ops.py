@@ -3,7 +3,7 @@
 from typing import List
 
 from .config import Config
-from .roofline import OpProfile, roofline_time, allreduce_time, alltoall_time, bytes2
+from .roofline import OpProfile, roofline_time, allreduce_time, alltoall_time, allgather_time, bytes2
 
 
 # --- Attention Projections ---
@@ -128,27 +128,21 @@ def op_index_ik_proj(T: int, cfg: Config) -> OpProfile:
 
 
 def op_index_kv_compression(B: int, S: int, ratio: int, cfg: Config) -> OpProfile:
-    """PLACEHOLDER: KV compression compute for index keys. Returns zero."""
+    """Index key compression for Lightning Index.
+    4 projections [d', d'] + group compression (g tokens -> 1).
+    Cube: 8*B*S*d'^2 + (8g-2)*B*d'*(S/g)
+    Vec:  (4g+1)*d'*B*(S/g)
+    Mem:  5*B*S*d' elements
     """
-    TODO: CLAUDE：请根据以下分析计算KV压缩的计算量和访存量，并填入代码中，然后更新注释说明：
-    步骤    说明    cube计算量    vector计算量    访存量
-                （BF16乘2，FP32乘4）
-③    Original Indexer    4∗2BS〖(d_c^′)〗^2+(12g-1)BSd_c^′∗S/g    0   (BSd_c^′+4(d_c^′ )^2+4∗BSd_c^′)+S/g[2∗BSd_c^′∗g∗2+BSd_c^′]
-    & Compressed Indexer            
+    d = cfg.model.index_head_dim   # d_c' = 128
+    g = ratio                       # group size = compression ratio
+    S_comp = S // g
 
-                
-符号    说明    参数值        
-d_c    K, V和Q的head维度     512        
-d_c^′    Indexer的q_k head维度     128        
-d_q    Query的head维度    1024        
-d_R    Q, K RoPE 维度     64        
-g    Group size    4        
-D    Hidden dimension    4096        
-B    Batch size    /        
-S    Sequence length    128        
-H_I    Lightning Index 头数 (类似MQA,  q, w 头数为 H_I, k头数为1)    64    
-    """
-    return OpProfile(name="index_kv_compress")
+    cube_flops = 8 * B * S * d**2 + (8 * g - 2) * B * d * S_comp
+    vec_ops = (4 * g + 1) * d * B * S_comp
+    mem_bytes = bytes2(5 * B * S * d)
+
+    return roofline_time("index_kv_compress", cube_flops, vec_ops, mem_bytes, cfg.hw)
 
 
 def op_index_score(B: int, S: int, ratio: int, cfg: Config) -> OpProfile:
@@ -204,26 +198,21 @@ def op_index_score_allreduce_decode(B: int, S_total: int, ratio: int, cfg: Confi
 # --- KV Compression Placeholder ---
 
 def op_kv_compression_prefill(B: int, S: int, ratio: int, cfg: Config) -> OpProfile:
-    """PLACEHOLDER: returns zero. User fills in compression algorithm costs."""
+    """KV compression for prefill: compress both K and V caches.
+    Per K/V: 4 projections [d, d] + group compression (g tokens -> 1).
+    Cube: 2*[8*B*S*d^2 + (8g-2)*B*d*(S/g)]  (x2 for K and V)
+    Vec:  2*(4g+1)*d*B*(S/g)                  (x2 for K and V)
+    Mem:  2*5*B*S*d elements                   (x2 for K and V)
     """
-    TODO: CLAUDE：请根据以下分析计算KV压缩的计算量和访存量，并填入代码中，然后更新注释说明：
-    步骤    说明    cube计算量    vector计算量    访存量
-                （BF16乘2，FP32乘4）
-②    Compressed KV    2∗[4∗2BS〖(d_c)〗^2+(12g-1)BSd_c∗S/g]    /    2[BSd_c+4(d_c )^2+4∗BSd_c]+S/g[2∗BSd_c∗g∗2+BSd_c ]          
+    d = cfg.model.head_dim   # d_c = 512
+    g = ratio                 # group size = compression ratio
+    S_comp = S // g
 
-                
-符号    说明    参数值        
-d_c    K, V和Q的head维度     512        
-d_c^′    Indexer的q_k head维度     128        
-d_q    Query的head维度    1024        
-d_R    Q, K RoPE 维度     64        
-g    Group size    4        
-D    Hidden dimension    4096        
-B    Batch size    /        
-S    Sequence length    128        
-H_I    Lightning Index 头数 (类似MQA,  q, w 头数为 H_I, k头数为1)    64    
-    """
-    return OpProfile(name="kv_compression")
+    cube_flops = 2 * (8 * B * S * d**2 + (8 * g - 2) * B * d * S_comp)
+    vec_ops = 2 * (4 * g + 1) * d * B * S_comp
+    mem_bytes = bytes2(2 * 5 * B * S * d)
+
+    return roofline_time("kv_compression", cube_flops, vec_ops, mem_bytes, cfg.hw)
 
 
 def op_kv_compression_decode(B: int, ratio: int, cfg: Config) -> OpProfile:
@@ -577,3 +566,21 @@ def op_lm_head(T: int, cfg: Config) -> OpProfile:
     act_in = bytes2(T * H)
     act_out = bytes2(T * v_per_rank)
     return roofline_time("lm_head", flops, 0, weight_bytes + act_in + act_out, cfg.hw)
+
+
+# --- SP AllGather ---
+
+def op_sp_allgather(T_sp: int, cfg: Config, label: str = "sp_allgather") -> OpProfile:
+    """SP AllGather: collect T_sp -> T_full along sequence dim.
+    Volume = T_full * H * 2 bytes (full output each rank receives).
+    The (n-1)/n factor in allgather_time handles actual transfer fraction."""
+    H = cfg.model.hidden_size
+    TP = cfg.rt.tp
+    if not cfg.rt.sp or TP <= 1:
+        return OpProfile(name=label)
+    T_full = T_sp * TP
+    vol = bytes2(T_full * H)
+    t = allgather_time(vol, TP, cfg.net.tp_bandwidth_gbps,
+                       cfg.net.latency_us, cfg.net.bandwidth_utilization)
+    return OpProfile(name=label, comm_bytes=vol, comm_time_s=t,
+                     time_s=t, bottleneck="COMM" if t > 0 else "")

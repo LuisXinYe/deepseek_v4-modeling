@@ -80,6 +80,16 @@ def alltoall_time(vol_bytes: float, n: int, bw_gbps: float,
     return factor * vol_bytes / (bw_gbps * 1e9 * bw_util) + latency_us * 1e-6
 
 
+def allgather_time(vol_bytes: float, n: int, bw_gbps: float,
+                   latency_us: float, bw_util: float) -> float:
+    """AllGather: (n-1)/n * vol / effective_bw + latency."""
+    if n <= 1:
+        return 0.0
+    factor = (n - 1) / n
+    steps = n - 1
+    return factor * vol_bytes / (bw_gbps * 1e9 * bw_util) + steps * latency_us * 1e-6
+
+
 def sum_ops(ops: List[OpProfile], name: str) -> OpProfile:
     """Sum a list of OpProfiles into a single aggregate."""
     total = OpProfile(name=name)

@@ -100,7 +100,8 @@ class Config:
         with open(device_path) as f:
             hw = HardwareConfig(**json.load(f))
         with open(network_path) as f:
-            net = NetworkConfig(**json.load(f))
+            # Normalize keys to lowercase (JSON uses GBps for clarity, fields use gbps)
+            net = NetworkConfig(**{k.lower(): v for k, v in json.load(f).items()})
         with open(model_path) as f:
             data = json.load(f)
             known = {f.name for f in dataclass_fields(ModelConfig)}

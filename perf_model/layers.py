@@ -18,6 +18,7 @@ from .ops import (
     op_moe_gate, op_moe_ep_dispatch, op_moe_ep_combine,
     op_moe_routed_experts, op_moe_shared_expert,
     op_rmsnorm, op_embedding, op_lm_head,
+    op_sp_allgather,
 )
 
 
@@ -48,9 +49,9 @@ def prefill_layer(layer_idx: int, cfg: Config) -> LayerProfile:
 
     # RMSNorm (in SP region)
     ops.append(op_rmsnorm(T_sp, cfg, "rmsnorm_attn"))
-    
-    # TODO: we need SP allgather here to get T_sp->T_full for attention !!!
-    # TODO: check other place, if we map T_sp -> T_full, then we need a SP allgather
+
+    # SP AllGather: T_sp -> T_full before attention projections
+    ops.append(op_sp_allgather(T_sp, cfg, "sp_ag_before_attn"))
 
     # Q/K/V projections (T_full tokens, weights split by TP for Q)
     ops.append(op_q_proj_dq(T_full, cfg))
@@ -102,6 +103,9 @@ def prefill_layer(layer_idx: int, cfg: Config) -> LayerProfile:
     # RMSNorm (in SP region)
     ops.append(op_rmsnorm(T_sp, cfg, "rmsnorm_moe"))
 
+    # SP AllGather: T_sp -> T_full before MoE gate
+    ops.append(op_sp_allgather(T_sp, cfg, "sp_ag_before_moe"))
+
     # MoE
     ops.append(op_moe_gate(T_full, cfg))
     ops.append(op_moe_ep_dispatch(T_sp, layer_idx, cfg))
@@ -126,7 +130,8 @@ def prefill_layer(layer_idx: int, cfg: Config) -> LayerProfile:
         ops.append(op_moe_ep_combine(T_sp, layer_idx, cfg))
         ops.extend(shared_ops)
         
-    # FIXME: claude: need SP allgather here for MoE output, T_sp -> T_full
+    # SP AllGather: T_sp -> T_full after MoE combine
+    ops.append(op_sp_allgather(T_sp, cfg, "sp_ag_after_moe"))
 
     # mHC post-MoE: sinkhorn + post
     ops.append(op_mhc_sinkhorn(T_full, cfg, "sinkhorn_moe"))
@@ -266,6 +271,11 @@ def prefill_model(cfg: Config) -> PhaseProfile:
     final_norm = op_rmsnorm(T_sp, cfg, "final_rmsnorm")
     phase.extra_ops.append(final_norm)
     phase.total_time_s += final_norm.time_s
+
+    # SP AllGather: T_sp -> T_full before LM Head
+    sp_ag = op_sp_allgather(T_sp, cfg, "sp_ag_before_lm_head")
+    phase.extra_ops.append(sp_ag)
+    phase.total_time_s += sp_ag.time_s
 
     # LM Head
     lm = op_lm_head(T_full, cfg)
