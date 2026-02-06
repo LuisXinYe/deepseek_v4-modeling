@@ -88,3 +88,6 @@ In `perf_model/ops.py`, three functions return zero profiles and are meant to be
 - Communication modeled as additive (not overlapped with compute)
 - Single-batch decode: SP provides no benefit (T=1)
 - DP splits global batch evenly; per-rank batch = batch_size / dp
+
+# TODO
+CLAUDE: add description in README.md about how to do TP, especially for mHC and Attention layer.
