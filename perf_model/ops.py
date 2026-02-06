@@ -103,7 +103,6 @@ def op_attn_tp_allreduce(T: int, cfg: Config) -> OpProfile:
 
 def op_index_iq_proj(T: int, cfg: Config) -> OpProfile:
     """W_iq: ColumnParallel [H, index_n_heads/TP * index_head_dim]."""
-    # FIXME: indexer query is projected from q_lora_rank, not hidden_size
     in_dim = cfg.model.q_lora_rank
     TP = cfg.rt.tp
     nh = cfg.model.index_n_heads
@@ -127,7 +126,7 @@ def op_index_ik_proj(T: int, cfg: Config) -> OpProfile:
     return roofline_time("index_ik_proj", flops, 0, weight_bytes + act_in + act_out, cfg.hw)
 
 
-def op_index_kv_compression(B: int, S: int, ratio: int, cfg: Config) -> OpProfile:
+def op_index_kv_compression_prefill(B: int, S: int, ratio: int, cfg: Config) -> OpProfile:
     """Index key compression for Lightning Index.
     4 projections [d', d'] + group compression (g tokens -> 1).
     Cube: 8*B*S*d'^2 + (8g-2)*B*d'*(S/g)
@@ -143,6 +142,25 @@ def op_index_kv_compression(B: int, S: int, ratio: int, cfg: Config) -> OpProfil
     mem_bytes = bytes2(5 * B * S * d)
 
     return roofline_time("index_kv_compress", cube_flops, vec_ops, mem_bytes, cfg.hw)
+
+def op_index_kv_compression_decode(B: int, S_total: int, ratio: int, cfg: Config) -> OpProfile:
+    """Index key compression for decode: exact per-step cost.
+    When S_total % ratio == 0: projections + group compression.
+    Otherwise: projections only (no group compression).
+    """
+    d = cfg.model.index_head_dim   # d_c' = 128
+    g = ratio
+
+    if S_total % g == 0:
+        cube_flops = 8 * B * d**2 + (8 * g - 2) * B * d
+        vec_ops    = (4 * g + 1) * B * d
+        mem_elems  = 10 * B * d + 4 * d**2
+    else:
+        cube_flops = 8 * B * d**2
+        vec_ops    = 0
+        mem_elems  = 5 * B * d + 4 * d**2
+
+    return roofline_time("index_kv_compress_decode", cube_flops, vec_ops, bytes2(mem_elems), cfg.hw)
 
 
 def op_index_score(B: int, S: int, ratio: int, cfg: Config) -> OpProfile:
@@ -215,11 +233,24 @@ def op_kv_compression_prefill(B: int, S: int, ratio: int, cfg: Config) -> OpProf
     return roofline_time("kv_compression", cube_flops, vec_ops, mem_bytes, cfg.hw)
 
 
-def op_kv_compression_decode(B: int, ratio: int, cfg: Config) -> OpProfile:
-    """PLACEHOLDER: amortized per-step cost. User fills in."""
-    # TODO: this is related to id of current decode token, if i%ratio==0 then full compression cost, else 0 cost. 
-    # TODO: try to add index value if possible, else for simplicity just return amortized cost here but mention to the user (explicitly print).
-    return OpProfile(name="kv_compression_decode")
+def op_kv_compression_decode(B: int, S_total: int, ratio: int, cfg: Config) -> OpProfile:
+    """KV compression for decode: exact per-step cost for both K and V.
+    When S_total % ratio == 0: projections + group compression.
+    Otherwise: projections only (no group compression).
+    """
+    d = cfg.model.head_dim   # d_c = 512
+    g = ratio
+
+    if S_total % g == 0:
+        cube_flops = 2 * (8 * B * d**2 + (8 * g - 2) * B * d)
+        vec_ops    = 2 * (4 * g + 1) * B * d
+        mem_elems  = 2 * (10 * B * d + 4 * d**2)
+    else:
+        cube_flops = 2 * 8 * B * d**2
+        vec_ops    = 0
+        mem_elems  = 2 * (5 * B * d + 4 * d**2)
+
+    return roofline_time("kv_compression_decode", cube_flops, vec_ops, bytes2(mem_elems), cfg.hw)
 
 
 # --- Attention Score Computation ---

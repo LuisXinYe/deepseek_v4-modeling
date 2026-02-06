@@ -56,14 +56,13 @@ Each run produces `output/<timestamp>/` containing:
 - `config.json` — merged config snapshot
 - `console_output.txt` — full console log
 
-## Placeholder Locations
+## KV Compression Ops
 
-One KV compression op in `perf_model/ops.py` still returns a zero profile:
-- `op_kv_compression_decode()` — fill in amortized per-step cost
-
-Already implemented:
+All compression ops are now implemented with exact per-step costs:
 - `op_kv_compression_prefill()` — K/V compression with group projections
-- `op_index_kv_compression()` — index key compression for Lightning Index
+- `op_kv_compression_decode()` — K/V compression per decode step (cost varies by `S_total % ratio`)
+- `op_index_kv_compression_prefill()` — index key compression for Lightning Index (prefill)
+- `op_index_kv_compression_decode()` — index key compression per decode step (cost varies by `S_total % ratio`)
 
 ## Model Parameters
 

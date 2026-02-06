@@ -34,11 +34,6 @@ def print_op_table(ops: List[OpProfile], indent: str = "  "):
     print(header)
     print(sep)
     for op in ops:
-        if op.time_s == 0 and op.name in ("kv_compression", "kv_compression_decode",
-                                            "index_kv_compress"):
-            # Skip zero placeholders in display (still show name)
-            print(f"{indent}{op.name:<25s} | {'---':>9s} | {'---':>9s} | {'---':>9s} | {'---':>9s} | {'PLACEHOLDER':>10s} | {'---':<5s}")
-            continue
         print(f"{indent}{op.name:<25s} | {fmt_ms(op.cube_time_s):>9s} | {fmt_ms(op.vec_time_s):>9s} | {fmt_ms(op.mem_time_s):>9s} | {fmt_ms(op.comm_time_s):>9s} | {fmt_ms(op.time_s):>10s} | {op.bottleneck:<5s}")
 
 

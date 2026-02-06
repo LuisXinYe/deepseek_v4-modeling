@@ -8,7 +8,7 @@ from .roofline import OpProfile, sum_ops
 from .ops import (
     op_q_proj_dq, op_q_proj_uq, op_k_proj, op_v_proj, op_wo_a, op_wo_b,
     op_attn_tp_allreduce,
-    op_index_iq_proj, op_index_ik_proj, op_index_kv_compression,
+    op_index_iq_proj, op_index_ik_proj, op_index_kv_compression_prefill, op_index_kv_compression_decode,
     op_index_score, op_index_score_allreduce,
     op_index_score_decode, op_index_score_allreduce_decode,
     op_kv_compression_prefill, op_kv_compression_decode,
@@ -62,7 +62,6 @@ def prefill_layer(layer_idx: int, cfg: Config) -> LayerProfile:
     # Determine if this layer uses Lightning Index
     # Index is needed when compressed seq len > topK (e.g. C4A: S//4=1024 > 512)
     # Not needed when compressed seq is already small (e.g. C128A: S//128=32 < 512)
-    # TODO: The logic should be simper: only use_index for C4A, not for C128A or full attention.
     use_index = (ratio == 4)
     # S_comp = S // ratio if ratio > 1 else S
     # use_index = ratio > 1 and S_comp > cfg.model.index_topk
@@ -71,7 +70,7 @@ def prefill_layer(layer_idx: int, cfg: Config) -> LayerProfile:
     if use_index:
         ops.append(op_index_iq_proj(T_full, cfg))
         ops.append(op_index_ik_proj(T_full, cfg))
-        ops.append(op_index_kv_compression(B, S, ratio, cfg))
+        ops.append(op_index_kv_compression_prefill(B, S, ratio, cfg))
         ops.append(op_index_score(B, S, ratio, cfg))
         ops.append(op_index_score_allreduce(B, S, ratio, cfg))
 
@@ -93,7 +92,6 @@ def prefill_layer(layer_idx: int, cfg: Config) -> LayerProfile:
     ops.append(op_attn_tp_allreduce(T_full, cfg))
 
     # mHC post-attention: sinkhorn + post
-    # FIXME: mHC should use T_full, sp not enabled for it
     ops.append(op_mhc_sinkhorn(T_full, cfg, "sinkhorn_attn"))
     ops.append(op_mhc_post(T_full, cfg, "mhc_post_attn"))
 
@@ -171,13 +169,13 @@ def decode_layer(layer_idx: int, S_total: int, cfg: Config) -> LayerProfile:
     if use_index:
         ops.append(op_index_iq_proj(T_full, cfg))
         ops.append(op_index_ik_proj(T_full, cfg))
-        ops.append(op_index_kv_compression(B, 1, ratio, cfg))
+        ops.append(op_index_kv_compression_decode(B, S_total, ratio, cfg))
         ops.append(op_index_score_decode(B, S_total, ratio, cfg))
         ops.append(op_index_score_allreduce_decode(B, S_total, ratio, cfg))
 
     # KV Compression (for all compressed layers)
     if ratio > 1:
-        ops.append(op_kv_compression_decode(B, ratio, cfg))
+        ops.append(op_kv_compression_decode(B, S_total, ratio, cfg))
 
     # Attention
     if ratio == 1:
