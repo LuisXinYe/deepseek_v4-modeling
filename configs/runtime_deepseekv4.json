@@ -2,7 +2,7 @@
     "seq_len": 4096,
     "batch_size": 1,
     "dp": 1,
-    "tp": 4,
+    "tp": 64,
     "ep": 64,
     "sp": true,
     "moe_load_balance_factor": 1.2,
