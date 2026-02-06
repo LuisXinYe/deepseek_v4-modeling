@@ -1,5 +1,8 @@
-"""Formatting and printing functions."""
+"""Formatting, printing, and CSV export functions."""
 
+import csv
+import json
+import dataclasses
 from typing import List, Optional
 
 from .config import Config
@@ -94,10 +97,20 @@ def print_config_summary(cfg: Config):
     print(f"  Layer types:         {r1} full-attn (ratio=1), {r4} C4A, {r128} C128A")
     print()
 
+    DP = cfg.rt.dp
+    TP = cfg.rt.tp
+    EP = cfg.rt.ep
+    total_gpus = TP * DP
+    edp = total_gpus / EP
+    per_rank_batch = cfg.rt.batch_size // DP
+
     print("Runtime:")
     print(f"  Seq len:             {cfg.rt.seq_len}")
-    print(f"  Batch size:          {cfg.rt.batch_size}")
-    print(f"  TP: {cfg.rt.tp}, EP: {cfg.rt.ep}, SP: {cfg.rt.sp}")
+    print(f"  Batch size (global): {cfg.rt.batch_size}")
+    print(f"  Per-rank batch:      {per_rank_batch}")
+    edp_str = str(int(edp)) if edp == int(edp) else f"{edp:.2f}"
+    print(f"  TP: {TP}, DP: {DP}, EP: {EP}, EDP: {edp_str}, SP: {cfg.rt.sp}")
+    print(f"  Total GPUs:          {total_gpus}")
     print(f"  MoE load balance:    {cfg.rt.moe_load_balance_factor}")
     print(f"  Output len:          {cfg.rt.output_len}")
     print(f"  Shared expert overlap: {cfg.rt.shared_expert_overlapped}")
@@ -178,8 +191,9 @@ def print_memory_report(cfg: Config):
     print()
 
     # KV Cache
+    per_rank_batch = cfg.rt.batch_size // cfg.rt.dp
     kv = kv_cache_memory(cfg)
-    print(f"  KV Cache (B={cfg.rt.batch_size}, S={cfg.rt.seq_len}):")
+    print(f"  KV Cache (per-rank B={per_rank_batch}, S={cfg.rt.seq_len}):")
     # Show a few representative layers
     for i in find_representative_layers(cfg):
         info = kv["layers"][i]
@@ -215,3 +229,118 @@ def print_memory_report(cfg: Config):
     if total_hbm > capacity:
         print(f"  WARNING: Exceeds HBM capacity by {fmt_bytes(total_hbm - capacity)}!")
     print()
+
+
+# =============================================================================
+# CSV Export Functions
+# =============================================================================
+
+def export_ops_csv(filepath: str, phase_profile: PhaseProfile):
+    """Export per-op breakdown for all layers + extra ops to CSV."""
+    with open(filepath, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            "layer_idx", "ratio", "op_name", "flops", "vec_ops", "mem_bytes",
+            "comm_bytes", "cube_time_ms", "vec_time_ms", "mem_time_ms",
+            "comm_time_ms", "total_time_ms", "bottleneck"
+        ])
+        for lp in phase_profile.layer_profiles:
+            for op in lp.ops:
+                writer.writerow([
+                    lp.layer_idx, lp.ratio, op.name,
+                    f"{op.flops:.0f}", f"{op.vec_ops:.0f}", f"{op.mem_bytes:.0f}",
+                    f"{op.comm_bytes:.0f}",
+                    f"{op.cube_time_s * 1000:.6f}", f"{op.vec_time_s * 1000:.6f}",
+                    f"{op.mem_time_s * 1000:.6f}", f"{op.comm_time_s * 1000:.6f}",
+                    f"{op.time_s * 1000:.6f}", op.bottleneck
+                ])
+        for op in phase_profile.extra_ops:
+            writer.writerow([
+                "extra", "", op.name,
+                f"{op.flops:.0f}", f"{op.vec_ops:.0f}", f"{op.mem_bytes:.0f}",
+                f"{op.comm_bytes:.0f}",
+                f"{op.cube_time_s * 1000:.6f}", f"{op.vec_time_s * 1000:.6f}",
+                f"{op.mem_time_s * 1000:.6f}", f"{op.comm_time_s * 1000:.6f}",
+                f"{op.time_s * 1000:.6f}", op.bottleneck
+            ])
+
+
+def export_layer_summary_csv(filepath: str, prefill: PhaseProfile,
+                              decode_step_profile: PhaseProfile):
+    """Export layer-level summary for both phases."""
+    with open(filepath, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            "phase", "layer_idx", "ratio", "total_time_ms",
+            "cube_time_ms", "vec_time_ms", "mem_time_ms", "comm_time_ms",
+            "bottleneck"
+        ])
+        for lp in prefill.layer_profiles:
+            t = lp.total
+            writer.writerow([
+                "prefill", lp.layer_idx, lp.ratio,
+                f"{t.time_s * 1000:.6f}", f"{t.cube_time_s * 1000:.6f}",
+                f"{t.vec_time_s * 1000:.6f}", f"{t.mem_time_s * 1000:.6f}",
+                f"{t.comm_time_s * 1000:.6f}", t.bottleneck
+            ])
+        for lp in decode_step_profile.layer_profiles:
+            t = lp.total
+            writer.writerow([
+                "decode", lp.layer_idx, lp.ratio,
+                f"{t.time_s * 1000:.6f}", f"{t.cube_time_s * 1000:.6f}",
+                f"{t.vec_time_s * 1000:.6f}", f"{t.mem_time_s * 1000:.6f}",
+                f"{t.comm_time_s * 1000:.6f}", t.bottleneck
+            ])
+
+
+def export_memory_csv(filepath: str, cfg: Config):
+    """Export KV cache + weight memory breakdown."""
+    kv = kv_cache_memory(cfg)
+    wm = weight_memory_per_rank(cfg)
+
+    with open(filepath, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["category", "component", "bytes", "human_readable"])
+
+        # KV cache per representative layer type
+        for i in find_representative_layers(cfg):
+            info = kv["layers"][i]
+            writer.writerow([
+                "kv_cache", f"layer_{i}_{info['type']}",
+                f"{info['bytes']:.0f}", fmt_bytes(info['bytes'])
+            ])
+        writer.writerow([
+            "kv_cache", "total",
+            f"{kv['total_bytes']:.0f}", fmt_bytes(kv['total_bytes'])
+        ])
+
+        # Weight memory
+        writer.writerow(["weights", "attn_per_layer", f"{wm['attn_per_layer']:.0f}", fmt_bytes(wm['attn_per_layer'])])
+        writer.writerow(["weights", "index_per_layer", f"{wm['index_per_layer']:.0f}", fmt_bytes(wm['index_per_layer'])])
+        writer.writerow(["weights", "moe_per_layer", f"{wm['moe_per_layer']:.0f}", fmt_bytes(wm['moe_per_layer'])])
+        writer.writerow(["weights", "total_attn", f"{wm['total_attn']:.0f}", fmt_bytes(wm['total_attn'])])
+        writer.writerow(["weights", "total_moe", f"{wm['total_moe']:.0f}", fmt_bytes(wm['total_moe'])])
+        writer.writerow(["weights", "total_other", f"{wm['total_other']:.0f}", fmt_bytes(wm['total_other'])])
+        writer.writerow(["weights", "total", f"{wm['total']:.0f}", fmt_bytes(wm['total'])])
+
+        # Total HBM
+        total_hbm = wm["total"] + kv["total_bytes"]
+        writer.writerow(["total", "hbm_usage", f"{total_hbm:.0f}", fmt_bytes(total_hbm)])
+        capacity = cfg.hw.hbm_capacity_gb * 1e9
+        writer.writerow(["total", "hbm_capacity", f"{capacity:.0f}", fmt_bytes(capacity)])
+
+
+def export_summary_csv(filepath: str, metrics: dict):
+    """Export end-to-end summary metrics as key-value CSV."""
+    with open(filepath, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["metric", "value"])
+        for k, v in metrics.items():
+            writer.writerow([k, v])
+
+
+def export_config_json(filepath: str, cfg: Config):
+    """Export merged config to JSON."""
+    d = dataclasses.asdict(cfg)
+    with open(filepath, "w") as f:
+        json.dump(d, f, indent=2)

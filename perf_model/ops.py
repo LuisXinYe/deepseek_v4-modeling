@@ -335,19 +335,43 @@ def op_attention_decode_compressed(B: int, S_total: int, ratio: int, cfg: Config
 
 # --- mHC (Hyper Connection) ---
 
-def op_mhc(T: int, cfg: Config, label: str = "mhc") -> OpProfile:
-    """mHC: 3 small matmuls of [mhc_mult, mhc_mult] x [mhc_mult, H].
-    Treated as vector ops since they're tiny per-token ops.
-    T is effective token count (B*S/TP if SP, else B*S)."""
-    M = cfg.model.mhc_mult
-    H = cfg.model.hidden_size
-    # 3 matmuls: each is [M, M] x [M, H] -> M*M*H*2 per token, but small
-    vec_ops = T * 3 * M * M * H * 2
-    # Memory: read/write state [T, M, H] + 3 small matrices [M, M]
-    state_bytes = bytes2(T * M * H) * 2  # read + write
-    matrix_bytes = bytes2(3 * M * M)
-    mem = state_bytes + matrix_bytes
-    return roofline_time(label, 0, vec_ops, mem, cfg.hw)
+def op_mhc_pre(T: int, cfg: Config, label: str = "mhc_pre") -> OpProfile:
+    """mHC pre: linear projections before sub-layer.
+    T is effective token count (B*S/TP if SP, else B*S).
+    n = mhc_mult, D = hidden_size.
+    FP32 throughout (×4 bytes per element)."""
+    n = cfg.model.mhc_mult
+    D = cfg.model.hidden_size
+    cube_flops = 2 * T * (n**2 + 2*n) * n * D + 5 * T * n + 2 * T * n**2
+    vec_ops = 2 * T * n
+    # FP32 memory (×4): input/output activations + intermediate
+    mem_bytes = 4 * (3 * T * n * D + T * (n**2 + 2*n) * n * D + T * (n**2 + 2*n))
+    return roofline_time(label, cube_flops, vec_ops, mem_bytes, cfg.hw)
+
+
+def op_mhc_sinkhorn(T: int, cfg: Config, label: str = "sinkhorn") -> OpProfile:
+    """Sinkhorn normalization step.
+    T is effective token count, n = mhc_mult.
+    FP32 throughout (×4 bytes per element)."""
+    n = cfg.model.mhc_mult
+    cube_flops = 0
+    vec_ops = T * n**2 + 40 * T * n * (2*n - 1)
+    # FP32 memory: 82 * T * n^2 * 4
+    mem_bytes = 4 * 82 * T * n**2
+    return roofline_time(label, cube_flops, vec_ops, mem_bytes, cfg.hw)
+
+
+def op_mhc_post(T: int, cfg: Config, label: str = "mhc_post") -> OpProfile:
+    """mHC post: linear projections after sub-layer.
+    T is effective token count, n = mhc_mult, D = hidden_size.
+    FP32 throughout (×4 bytes per element)."""
+    n = cfg.model.mhc_mult
+    D = cfg.model.hidden_size
+    cube_flops = 2 * T * n**2 * D + 3 * T * n * D
+    vec_ops = 0
+    # FP32 memory
+    mem_bytes = 4 * (T * n + T * D + 6 * T * n * D + T * n**2)
+    return roofline_time(label, cube_flops, vec_ops, mem_bytes, cfg.hw)
 
 
 # --- MoE ---
@@ -363,24 +387,29 @@ def op_moe_gate(T: int, cfg: Config) -> OpProfile:
     return roofline_time("moe_gate", flops, 0, weight_bytes + act_in + act_out, cfg.hw)
 
 
-def op_moe_ep_dispatch(T: int, cfg: Config) -> OpProfile:
-    """EP dispatch AllToAll: (EP-1)/EP * T * top_k * H * 2 bytes."""
+def op_moe_ep_dispatch(T: int, layer_idx: int, cfg: Config) -> OpProfile:
+    """EP dispatch AllToAll: (EP-1)/EP * T * top_k * H * load_factor * 2 bytes.
+    Volume scaled by load_factor to model bottleneck rank receiving more tokens."""
     EP = cfg.rt.ep
     H = cfg.model.hidden_size
     top_k = cfg.model.num_experts_per_tok
-    vol = bytes2(T * top_k * H)
+    n_hash = cfg.model.n_hash_layers
+    load_factor = 1.0 if layer_idx < n_hash else cfg.rt.moe_load_balance_factor
+    vol = bytes2(T * top_k * H * load_factor)
     t = alltoall_time(vol, EP, cfg.net.ep_bandwidth_gbps,
                       cfg.net.latency_us, cfg.net.bandwidth_utilization)
     return OpProfile(name="moe_ep_dispatch", comm_bytes=vol, comm_time_s=t,
                      time_s=t, bottleneck="COMM" if t > 0 else "")
 
 
-def op_moe_ep_combine(T: int, cfg: Config) -> OpProfile:
-    """EP combine AllToAll: same volume as dispatch."""
+def op_moe_ep_combine(T: int, layer_idx: int, cfg: Config) -> OpProfile:
+    """EP combine AllToAll: same volume as dispatch (scaled by load_factor)."""
     EP = cfg.rt.ep
     H = cfg.model.hidden_size
     top_k = cfg.model.num_experts_per_tok
-    vol = bytes2(T * top_k * H)
+    n_hash = cfg.model.n_hash_layers
+    load_factor = 1.0 if layer_idx < n_hash else cfg.rt.moe_load_balance_factor
+    vol = bytes2(T * top_k * H * load_factor)
     t = alltoall_time(vol, EP, cfg.net.ep_bandwidth_gbps,
                       cfg.net.latency_us, cfg.net.bandwidth_utilization)
     return OpProfile(name="moe_ep_combine", comm_bytes=vol, comm_time_s=t,

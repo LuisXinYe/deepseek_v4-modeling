@@ -6,7 +6,7 @@ from .roofline import bytes2
 
 def kv_cache_memory(cfg: Config) -> dict:
     """Per-layer and total KV cache memory (per batch)."""
-    B = cfg.rt.batch_size
+    B = cfg.rt.batch_size // cfg.rt.dp
     S = cfg.rt.seq_len
     layers = {}
     total_bytes = 0

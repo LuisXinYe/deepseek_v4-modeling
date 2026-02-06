@@ -60,6 +60,7 @@ class ModelConfig:
 class RuntimeConfig:
     seq_len: int = 4096
     batch_size: int = 1
+    dp: int = 1
     tp: int = 4
     ep: int = 64
     sp: bool = True

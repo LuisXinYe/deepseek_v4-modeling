@@ -14,7 +14,8 @@ from .ops import (
     op_kv_compression_prefill, op_kv_compression_decode,
     op_attention_prefill_full, op_attention_prefill_compressed,
     op_attention_decode_full, op_attention_decode_compressed,
-    op_mhc, op_moe_gate, op_moe_ep_dispatch, op_moe_ep_combine,
+    op_mhc_pre, op_mhc_sinkhorn, op_mhc_post,
+    op_moe_gate, op_moe_ep_dispatch, op_moe_ep_combine,
     op_moe_routed_experts, op_moe_shared_expert,
     op_rmsnorm, op_embedding, op_lm_head,
 )
@@ -33,7 +34,7 @@ class LayerProfile:
 
 def prefill_layer(layer_idx: int, cfg: Config) -> LayerProfile:
     """Compute prefill cost for a single layer."""
-    B = cfg.rt.batch_size
+    B = cfg.rt.batch_size // cfg.rt.dp
     S = cfg.rt.seq_len
     TP = cfg.rt.tp
     ratio = cfg.model.compress_ratios[layer_idx]
@@ -43,7 +44,7 @@ def prefill_layer(layer_idx: int, cfg: Config) -> LayerProfile:
     ops = []
 
     # mHC pre-attention
-    ops.append(op_mhc(T_sp, cfg, "mhc_pre_attn"))
+    ops.append(op_mhc_pre(T_sp, cfg, "mhc_pre_attn"))
 
     # RMSNorm (in SP region)
     ops.append(op_rmsnorm(T_sp, cfg, "rmsnorm_attn"))
@@ -85,18 +86,19 @@ def prefill_layer(layer_idx: int, cfg: Config) -> LayerProfile:
     # TP AllReduce (or AG+RS for SP, same volume)
     ops.append(op_attn_tp_allreduce(T_full, cfg))
 
-    # mHC post-attention
-    ops.append(op_mhc(T_sp, cfg, "mhc_post_attn"))
+    # mHC post-attention: sinkhorn + post
+    ops.append(op_mhc_sinkhorn(T_sp, cfg, "sinkhorn_attn"))
+    ops.append(op_mhc_post(T_sp, cfg, "mhc_post_attn"))
 
     # mHC pre-MoE
-    ops.append(op_mhc(T_sp, cfg, "mhc_pre_moe"))
+    ops.append(op_mhc_pre(T_sp, cfg, "mhc_pre_moe"))
 
     # RMSNorm (in SP region)
     ops.append(op_rmsnorm(T_sp, cfg, "rmsnorm_moe"))
 
     # MoE
     ops.append(op_moe_gate(T_full, cfg))
-    ops.append(op_moe_ep_dispatch(T_full, cfg))
+    ops.append(op_moe_ep_dispatch(T_full, layer_idx, cfg))
 
     routed_ops = op_moe_routed_experts(T_full, layer_idx, cfg)
     shared_ops = op_moe_shared_expert(T_full, cfg)
@@ -106,26 +108,21 @@ def prefill_layer(layer_idx: int, cfg: Config) -> LayerProfile:
         routed_time = sum(op.time_s for op in routed_ops)
         shared_time = sum(op.time_s for op in shared_ops)
         dispatch_op = ops[-1]  # ep_dispatch
-        # Model: time_moe = max(shared_time, dispatch_time + routed_time + combine_time)
-        # We already added dispatch above. Add routed ops + combine.
-        # Then conditionally add shared if it's slower.
         ops.extend(routed_ops)
-        ops.append(op_moe_ep_combine(T_full, cfg))
+        ops.append(op_moe_ep_combine(T_full, layer_idx, cfg))
         combine_time = ops[-1].time_s
         routed_total = dispatch_op.time_s + routed_time + combine_time
         if shared_time > routed_total:
-            # Shared is the bottleneck, add the excess time
             excess = shared_time - routed_total
             ops.append(OpProfile(name="shared_expert_excess", time_s=excess))
-        # Note: shared expert ops not added individually in overlapped mode
-        # to avoid double-counting. Their compute is "free" if faster than routed.
     else:
         ops.extend(routed_ops)
-        ops.append(op_moe_ep_combine(T_full, cfg))
+        ops.append(op_moe_ep_combine(T_full, layer_idx, cfg))
         ops.extend(shared_ops)
 
-    # mHC post-MoE
-    ops.append(op_mhc(T_sp, cfg, "mhc_post_moe"))
+    # mHC post-MoE: sinkhorn + post
+    ops.append(op_mhc_sinkhorn(T_sp, cfg, "sinkhorn_moe"))
+    ops.append(op_mhc_post(T_sp, cfg, "mhc_post_moe"))
 
     lp = LayerProfile(layer_idx=layer_idx, ratio=ratio, ops=ops)
     lp.compute_total()
@@ -134,7 +131,7 @@ def prefill_layer(layer_idx: int, cfg: Config) -> LayerProfile:
 
 def decode_layer(layer_idx: int, S_total: int, cfg: Config) -> LayerProfile:
     """Compute decode cost for a single layer (1 token generation step)."""
-    B = cfg.rt.batch_size
+    B = cfg.rt.batch_size // cfg.rt.dp
     TP = cfg.rt.tp
     ratio = cfg.model.compress_ratios[layer_idx]
     T_full = B * 1  # 1 token per sequence
@@ -143,7 +140,7 @@ def decode_layer(layer_idx: int, S_total: int, cfg: Config) -> LayerProfile:
     ops = []
 
     # mHC pre-attention
-    ops.append(op_mhc(T_sp, cfg, "mhc_pre_attn"))
+    ops.append(op_mhc_pre(T_sp, cfg, "mhc_pre_attn"))
 
     # RMSNorm
     ops.append(op_rmsnorm(T_sp, cfg, "rmsnorm_attn"))
@@ -183,18 +180,19 @@ def decode_layer(layer_idx: int, S_total: int, cfg: Config) -> LayerProfile:
     # TP AllReduce
     ops.append(op_attn_tp_allreduce(T_full, cfg))
 
-    # mHC post-attention
-    ops.append(op_mhc(T_sp, cfg, "mhc_post_attn"))
+    # mHC post-attention: sinkhorn + post
+    ops.append(op_mhc_sinkhorn(T_sp, cfg, "sinkhorn_attn"))
+    ops.append(op_mhc_post(T_sp, cfg, "mhc_post_attn"))
 
     # mHC pre-MoE
-    ops.append(op_mhc(T_sp, cfg, "mhc_pre_moe"))
+    ops.append(op_mhc_pre(T_sp, cfg, "mhc_pre_moe"))
 
     # RMSNorm
     ops.append(op_rmsnorm(T_sp, cfg, "rmsnorm_moe"))
 
     # MoE
     ops.append(op_moe_gate(T_full, cfg))
-    ops.append(op_moe_ep_dispatch(T_full, cfg))
+    ops.append(op_moe_ep_dispatch(T_full, layer_idx, cfg))
 
     routed_ops = op_moe_routed_experts(T_full, layer_idx, cfg)
     shared_ops = op_moe_shared_expert(T_full, cfg)
@@ -204,7 +202,7 @@ def decode_layer(layer_idx: int, S_total: int, cfg: Config) -> LayerProfile:
         shared_time = sum(op.time_s for op in shared_ops)
         dispatch_op = ops[-1]
         ops.extend(routed_ops)
-        ops.append(op_moe_ep_combine(T_full, cfg))
+        ops.append(op_moe_ep_combine(T_full, layer_idx, cfg))
         combine_time = ops[-1].time_s
         routed_total = dispatch_op.time_s + routed_time + combine_time
         if shared_time > routed_total:
@@ -212,11 +210,12 @@ def decode_layer(layer_idx: int, S_total: int, cfg: Config) -> LayerProfile:
             ops.append(OpProfile(name="shared_expert_excess", time_s=excess))
     else:
         ops.extend(routed_ops)
-        ops.append(op_moe_ep_combine(T_full, cfg))
+        ops.append(op_moe_ep_combine(T_full, layer_idx, cfg))
         ops.extend(shared_ops)
 
-    # mHC post-MoE
-    ops.append(op_mhc(T_sp, cfg, "mhc_post_moe"))
+    # mHC post-MoE: sinkhorn + post
+    ops.append(op_mhc_sinkhorn(T_sp, cfg, "sinkhorn_moe"))
+    ops.append(op_mhc_post(T_sp, cfg, "mhc_post_moe"))
 
     lp = LayerProfile(layer_idx=layer_idx, ratio=ratio, ops=ops)
     lp.compute_total()
@@ -238,7 +237,7 @@ class PhaseProfile:
 
 def prefill_model(cfg: Config) -> PhaseProfile:
     """Full prefill: Embedding + all layers + LM Head."""
-    B = cfg.rt.batch_size
+    B = cfg.rt.batch_size // cfg.rt.dp
     S = cfg.rt.seq_len
     T_full = B * S
 
@@ -271,7 +270,7 @@ def prefill_model(cfg: Config) -> PhaseProfile:
 
 def decode_step(S_total: int, cfg: Config) -> PhaseProfile:
     """Single decode step at context length S_total."""
-    B = cfg.rt.batch_size
+    B = cfg.rt.batch_size // cfg.rt.dp
     T_full = B * 1
 
     phase = PhaseProfile(phase=f"decode_step@{S_total}", total_tokens=B)
@@ -316,7 +315,8 @@ def decode_model(cfg: Config) -> PhaseProfile:
         step_profile = decode_step(S_total, cfg)
         total_time += step_profile.total_time_s
 
+    B = cfg.rt.batch_size // cfg.rt.dp
     first_step.total_time_s = total_time
     first_step.phase = "decode_total"
-    first_step.total_tokens = cfg.rt.batch_size * output_len
+    first_step.total_tokens = B * output_len
     return first_step

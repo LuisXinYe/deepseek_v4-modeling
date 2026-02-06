@@ -66,12 +66,14 @@ def allreduce_time(vol_bytes: float, n: int, bw_gbps: float,
     if n <= 1:
         return 0.0
     factor = 2.0 * (n - 1) / n
-    return factor * vol_bytes / (bw_gbps * 1e9 * bw_util) + latency_us * 1e-6
+    steps = 2 * (n - 1)
+    return factor * vol_bytes / (bw_gbps * 1e9 * bw_util) + steps * latency_us * 1e-6
 
 
 def alltoall_time(vol_bytes: float, n: int, bw_gbps: float,
                   latency_us: float, bw_util: float) -> float:
     """AllToAll: (n-1)/n * vol / effective_bw + latency."""
+     # FIXME: the alltoall should consider load imbalance factor => more volume.
     if n <= 1:
         return 0.0
     factor = (n - 1) / n
