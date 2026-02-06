@@ -52,7 +52,9 @@ class ModelConfig:
 
     @property
     def k_dim(self) -> int:
-        return self.head_dim + self.rope_head_dim  # 512 + 64 = 576
+        # FIXME: now use head dim directly, the rope is contained inside the head dim
+        # return self.head_dim + self.rope_head_dim  # 512 + 64 = 576
+        return self.head_dim  # 512
 
     @property
     def v_dim(self) -> int:
@@ -60,7 +62,8 @@ class ModelConfig:
 
     @property
     def compress_c_k(self) -> int:
-        return self.head_dim + self.rope_head_dim  # = k_dim = 576
+        # return self.head_dim + self.rope_head_dim  # = k_dim = 576
+        return self.head_dim  # = k_dim = 512
 
     @property
     def compress_c_v(self) -> int:
@@ -97,7 +100,8 @@ class Config:
         with open(device_path) as f:
             hw = HardwareConfig(**json.load(f))
         with open(network_path) as f:
-            net = NetworkConfig(**json.load(f))
+            # Normalize keys to lowercase (JSON uses GBps for clarity, fields use gbps)
+            net = NetworkConfig(**{k.lower(): v for k, v in json.load(f).items()})
         with open(model_path) as f:
             data = json.load(f)
             known = {f.name for f in dataclass_fields(ModelConfig)}

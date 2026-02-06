@@ -1,8 +1,8 @@
 {
     "seq_len": 4096,
-    "batch_size": 4,
-    "dp": 4,
-    "tp": 8,
+    "batch_size": 1,
+    "dp": 1,
+    "tp": 32,
     "ep": 32,
     "sp": true,
     "moe_load_balance_factor": 1.2,
