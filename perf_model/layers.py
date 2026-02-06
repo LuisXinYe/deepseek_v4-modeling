@@ -1,0 +1,322 @@
+"""LayerProfile, PhaseProfile, and layer/phase aggregation."""
+
+from dataclasses import dataclass, field
+from typing import List, Optional
+
+from .config import Config
+from .roofline import OpProfile, sum_ops
+from .ops import (
+    op_q_proj_dq, op_q_proj_uq, op_k_proj, op_v_proj, op_wo_a, op_wo_b,
+    op_attn_tp_allreduce,
+    op_index_iq_proj, op_index_ik_proj, op_index_kv_compression,
+    op_index_score, op_index_score_allreduce,
+    op_index_score_decode, op_index_score_allreduce_decode,
+    op_kv_compression_prefill, op_kv_compression_decode,
+    op_attention_prefill_full, op_attention_prefill_compressed,
+    op_attention_decode_full, op_attention_decode_compressed,
+    op_mhc, op_moe_gate, op_moe_ep_dispatch, op_moe_ep_combine,
+    op_moe_routed_experts, op_moe_shared_expert,
+    op_rmsnorm, op_embedding, op_lm_head,
+)
+
+
+@dataclass
+class LayerProfile:
+    layer_idx: int
+    ratio: int
+    ops: List[OpProfile] = field(default_factory=list)
+    total: Optional[OpProfile] = None
+
+    def compute_total(self):
+        self.total = sum_ops(self.ops, f"layer_{self.layer_idx}")
+
+
+def prefill_layer(layer_idx: int, cfg: Config) -> LayerProfile:
+    """Compute prefill cost for a single layer."""
+    B = cfg.rt.batch_size
+    S = cfg.rt.seq_len
+    TP = cfg.rt.tp
+    ratio = cfg.model.compress_ratios[layer_idx]
+    T_full = B * S
+    T_sp = B * S // TP if cfg.rt.sp else T_full
+
+    ops = []
+
+    # mHC pre-attention
+    ops.append(op_mhc(T_sp, cfg, "mhc_pre_attn"))
+
+    # RMSNorm (in SP region)
+    ops.append(op_rmsnorm(T_sp, cfg, "rmsnorm_attn"))
+
+    # Q/K/V projections (T_full tokens, weights split by TP for Q)
+    ops.append(op_q_proj_dq(T_full, cfg))
+    ops.append(op_q_proj_uq(T_full, cfg))
+    ops.append(op_k_proj(T_full, cfg))
+    ops.append(op_v_proj(T_full, cfg))
+
+    # Determine if this layer uses Lightning Index
+    # Index is needed when compressed seq len > topK (e.g. C4A: S//4=1024 > 512)
+    # Not needed when compressed seq is already small (e.g. C128A: S//128=32 < 512)
+    S_comp = S // ratio if ratio > 1 else S
+    use_index = ratio > 1 and S_comp > cfg.model.index_topk
+
+    # Index + Compression (only for layers that use Lightning Index)
+    if use_index:
+        ops.append(op_index_iq_proj(T_full, cfg))
+        ops.append(op_index_ik_proj(T_full, cfg))
+        ops.append(op_index_kv_compression(B, S, ratio, cfg))
+        ops.append(op_index_score(B, S, ratio, cfg))
+        ops.append(op_index_score_allreduce(B, S, ratio, cfg))
+
+    # KV Compression (for all compressed layers)
+    if ratio > 1:
+        ops.append(op_kv_compression_prefill(B, S, ratio, cfg))
+
+    # Attention
+    if ratio == 1:
+        ops.append(op_attention_prefill_full(B, S, cfg))
+    else:
+        ops.append(op_attention_prefill_compressed(B, S, ratio, cfg, use_index=use_index))
+
+    # Output projection
+    ops.append(op_wo_a(T_full, cfg))
+    ops.append(op_wo_b(T_full, cfg))
+
+    # TP AllReduce (or AG+RS for SP, same volume)
+    ops.append(op_attn_tp_allreduce(T_full, cfg))
+
+    # mHC post-attention
+    ops.append(op_mhc(T_sp, cfg, "mhc_post_attn"))
+
+    # mHC pre-MoE
+    ops.append(op_mhc(T_sp, cfg, "mhc_pre_moe"))
+
+    # RMSNorm (in SP region)
+    ops.append(op_rmsnorm(T_sp, cfg, "rmsnorm_moe"))
+
+    # MoE
+    ops.append(op_moe_gate(T_full, cfg))
+    ops.append(op_moe_ep_dispatch(T_full, cfg))
+
+    routed_ops = op_moe_routed_experts(T_full, layer_idx, cfg)
+    shared_ops = op_moe_shared_expert(T_full, cfg)
+
+    if cfg.rt.shared_expert_overlapped:
+        # Shared expert overlaps with routed; take max
+        routed_time = sum(op.time_s for op in routed_ops)
+        shared_time = sum(op.time_s for op in shared_ops)
+        dispatch_op = ops[-1]  # ep_dispatch
+        # Model: time_moe = max(shared_time, dispatch_time + routed_time + combine_time)
+        # We already added dispatch above. Add routed ops + combine.
+        # Then conditionally add shared if it's slower.
+        ops.extend(routed_ops)
+        ops.append(op_moe_ep_combine(T_full, cfg))
+        combine_time = ops[-1].time_s
+        routed_total = dispatch_op.time_s + routed_time + combine_time
+        if shared_time > routed_total:
+            # Shared is the bottleneck, add the excess time
+            excess = shared_time - routed_total
+            ops.append(OpProfile(name="shared_expert_excess", time_s=excess))
+        # Note: shared expert ops not added individually in overlapped mode
+        # to avoid double-counting. Their compute is "free" if faster than routed.
+    else:
+        ops.extend(routed_ops)
+        ops.append(op_moe_ep_combine(T_full, cfg))
+        ops.extend(shared_ops)
+
+    # mHC post-MoE
+    ops.append(op_mhc(T_sp, cfg, "mhc_post_moe"))
+
+    lp = LayerProfile(layer_idx=layer_idx, ratio=ratio, ops=ops)
+    lp.compute_total()
+    return lp
+
+
+def decode_layer(layer_idx: int, S_total: int, cfg: Config) -> LayerProfile:
+    """Compute decode cost for a single layer (1 token generation step)."""
+    B = cfg.rt.batch_size
+    TP = cfg.rt.tp
+    ratio = cfg.model.compress_ratios[layer_idx]
+    T_full = B * 1  # 1 token per sequence
+    T_sp = T_full  # SP doesn't help with single token
+
+    ops = []
+
+    # mHC pre-attention
+    ops.append(op_mhc(T_sp, cfg, "mhc_pre_attn"))
+
+    # RMSNorm
+    ops.append(op_rmsnorm(T_sp, cfg, "rmsnorm_attn"))
+
+    # Q/K/V projections
+    ops.append(op_q_proj_dq(T_full, cfg))
+    ops.append(op_q_proj_uq(T_full, cfg))
+    ops.append(op_k_proj(T_full, cfg))
+    ops.append(op_v_proj(T_full, cfg))
+
+    # Determine if this layer uses Lightning Index
+    S_comp = S_total // ratio if ratio > 1 else S_total
+    use_index = ratio > 1 and S_comp > cfg.model.index_topk
+
+    # Index (only for layers that use Lightning Index)
+    if use_index:
+        ops.append(op_index_iq_proj(T_full, cfg))
+        ops.append(op_index_ik_proj(T_full, cfg))
+        ops.append(op_index_kv_compression(B, 1, ratio, cfg))
+        ops.append(op_index_score_decode(B, S_total, ratio, cfg))
+        ops.append(op_index_score_allreduce_decode(B, S_total, ratio, cfg))
+
+    # KV Compression (for all compressed layers)
+    if ratio > 1:
+        ops.append(op_kv_compression_decode(B, ratio, cfg))
+
+    # Attention
+    if ratio == 1:
+        ops.append(op_attention_decode_full(B, S_total, cfg))
+    else:
+        ops.append(op_attention_decode_compressed(B, S_total, ratio, cfg, use_index=use_index))
+
+    # Output projection
+    ops.append(op_wo_a(T_full, cfg))
+    ops.append(op_wo_b(T_full, cfg))
+
+    # TP AllReduce
+    ops.append(op_attn_tp_allreduce(T_full, cfg))
+
+    # mHC post-attention
+    ops.append(op_mhc(T_sp, cfg, "mhc_post_attn"))
+
+    # mHC pre-MoE
+    ops.append(op_mhc(T_sp, cfg, "mhc_pre_moe"))
+
+    # RMSNorm
+    ops.append(op_rmsnorm(T_sp, cfg, "rmsnorm_moe"))
+
+    # MoE
+    ops.append(op_moe_gate(T_full, cfg))
+    ops.append(op_moe_ep_dispatch(T_full, cfg))
+
+    routed_ops = op_moe_routed_experts(T_full, layer_idx, cfg)
+    shared_ops = op_moe_shared_expert(T_full, cfg)
+
+    if cfg.rt.shared_expert_overlapped:
+        routed_time = sum(op.time_s for op in routed_ops)
+        shared_time = sum(op.time_s for op in shared_ops)
+        dispatch_op = ops[-1]
+        ops.extend(routed_ops)
+        ops.append(op_moe_ep_combine(T_full, cfg))
+        combine_time = ops[-1].time_s
+        routed_total = dispatch_op.time_s + routed_time + combine_time
+        if shared_time > routed_total:
+            excess = shared_time - routed_total
+            ops.append(OpProfile(name="shared_expert_excess", time_s=excess))
+    else:
+        ops.extend(routed_ops)
+        ops.append(op_moe_ep_combine(T_full, cfg))
+        ops.extend(shared_ops)
+
+    # mHC post-MoE
+    ops.append(op_mhc(T_sp, cfg, "mhc_post_moe"))
+
+    lp = LayerProfile(layer_idx=layer_idx, ratio=ratio, ops=ops)
+    lp.compute_total()
+    return lp
+
+
+# =============================================================================
+# End-to-End
+# =============================================================================
+
+@dataclass
+class PhaseProfile:
+    phase: str
+    layer_profiles: List[LayerProfile] = field(default_factory=list)
+    extra_ops: List[OpProfile] = field(default_factory=list)
+    total_time_s: float = 0.0
+    total_tokens: int = 0
+
+
+def prefill_model(cfg: Config) -> PhaseProfile:
+    """Full prefill: Embedding + all layers + LM Head."""
+    B = cfg.rt.batch_size
+    S = cfg.rt.seq_len
+    T_full = B * S
+
+    phase = PhaseProfile(phase="prefill", total_tokens=T_full)
+
+    # Embedding
+    emb = op_embedding(B, S, cfg)
+    phase.extra_ops.append(emb)
+    phase.total_time_s += emb.time_s
+
+    # All layers
+    for i in range(cfg.model.num_layers):
+        lp = prefill_layer(i, cfg)
+        phase.layer_profiles.append(lp)
+        phase.total_time_s += lp.total.time_s
+
+    # Final RMSNorm
+    T_sp = B * S // cfg.rt.tp if cfg.rt.sp else T_full
+    final_norm = op_rmsnorm(T_sp, cfg, "final_rmsnorm")
+    phase.extra_ops.append(final_norm)
+    phase.total_time_s += final_norm.time_s
+
+    # LM Head
+    lm = op_lm_head(T_full, cfg)
+    phase.extra_ops.append(lm)
+    phase.total_time_s += lm.time_s
+
+    return phase
+
+
+def decode_step(S_total: int, cfg: Config) -> PhaseProfile:
+    """Single decode step at context length S_total."""
+    B = cfg.rt.batch_size
+    T_full = B * 1
+
+    phase = PhaseProfile(phase=f"decode_step@{S_total}", total_tokens=B)
+
+    # Embedding (single token)
+    emb = op_embedding(B, 1, cfg)
+    phase.extra_ops.append(emb)
+    phase.total_time_s += emb.time_s
+
+    # All layers
+    for i in range(cfg.model.num_layers):
+        lp = decode_layer(i, S_total, cfg)
+        phase.layer_profiles.append(lp)
+        phase.total_time_s += lp.total.time_s
+
+    # Final RMSNorm
+    final_norm = op_rmsnorm(T_full, cfg, "final_rmsnorm")
+    phase.extra_ops.append(final_norm)
+    phase.total_time_s += final_norm.time_s
+
+    # LM Head
+    lm = op_lm_head(T_full, cfg)
+    phase.extra_ops.append(lm)
+    phase.total_time_s += lm.time_s
+
+    return phase
+
+
+def decode_model(cfg: Config) -> PhaseProfile:
+    """Total decode phase: iterate over output_len steps with growing context.
+    Returns aggregate profile at S_total = seq_len (first decode step)."""
+    S_base = cfg.rt.seq_len
+    output_len = cfg.rt.output_len
+
+    # Report detailed profile at first step (context = seq_len)
+    first_step = decode_step(S_base, cfg)
+
+    # Compute total decode time across all steps
+    total_time = 0.0
+    for step in range(output_len):
+        S_total = S_base + step
+        step_profile = decode_step(S_total, cfg)
+        total_time += step_profile.total_time_s
+
+    first_step.total_time_s = total_time
+    first_step.phase = "decode_total"
+    first_step.total_tokens = cfg.rt.batch_size * output_len
+    return first_step

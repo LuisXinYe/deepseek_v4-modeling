@@ -1,0 +1,10 @@
+{
+    "seq_len": 4096,
+    "batch_size": 1,
+    "tp": 4,
+    "ep": 64,
+    "sp": true,
+    "moe_load_balance_factor": 1.2,
+    "output_len": 256,
+    "shared_expert_overlapped": true
+}
