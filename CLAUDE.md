@@ -18,7 +18,7 @@ configs/                  # Hardware, network, model, runtime JSON configs
 perf_model/               # Core package
   __init__.py             # Re-exports public API
   config.py               # Config dataclasses + JSON loader
-  roofline.py             # OpProfile, roofline engine, comm helpers (allreduce/alltoall)
+  roofline.py             # OpProfile, roofline engine, comm helpers (allreduce/alltoall/allgather)
   ops.py                  # ~30 per-op cost functions (attention, MoE, index, etc.)
   layers.py               # Layer/phase aggregation (prefill_layer, decode_layer, prefill_model, decode_model)
   memory.py               # KV cache + weight memory analysis
@@ -42,7 +42,7 @@ Pipeline: **config** -> **roofline** -> **ops** -> **layers** -> **memory/report
 - DP (Data Parallel) splits global batch across ranks; per-rank batch = batch_size / dp
 - TP (Tensor Parallel) splits Q heads and output projections
 - EP (Expert Parallel) splits routed experts across ranks
-- SP (Sequence Parallel) splits sequence dimension for non-matmul ops
+- SP (Sequence Parallel) splits sequence dimension for non-matmul ops; AllGather at T_sp -> T_full transitions
 - MoE `load_balance_factor` = 1.0 for first `n_hash_layers`, user-specified otherwise
 - Shared expert can overlap with routed experts (configurable)
 
@@ -58,10 +58,12 @@ Each run produces `output/<timestamp>/` containing:
 
 ## Placeholder Locations
 
-KV compression ops in `perf_model/ops.py` return zero profiles:
-- `op_kv_compression_prefill()` — fill in compression algorithm costs
+One KV compression op in `perf_model/ops.py` still returns a zero profile:
 - `op_kv_compression_decode()` — fill in amortized per-step cost
-- `op_index_kv_compression()` — fill in index key compression costs
+
+Already implemented:
+- `op_kv_compression_prefill()` — K/V compression with group projections
+- `op_index_kv_compression()` — index key compression for Lightning Index
 
 ## Model Parameters
 

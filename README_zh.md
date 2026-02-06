@@ -6,7 +6,7 @@
 
 - **Roofline 模型**：每个算子分别追踪 Cube（矩阵乘）、Vector、Memory 三种耗时，瓶颈 = argmax
 - **并行策略建模**：支持 TP（张量并行）、DP（数据并行）、EP（专家并行）、SP（序列并行）
-- **通信分析**：AllReduce 和 AllToAll 通信代价估算；逐层和逐阶段的通信 vs 计算分解
+- **通信分析**：AllReduce、AllToAll 和 AllGather 通信代价估算；逐层和逐阶段的通信 vs 计算分解
 - **逐算子分析**：约 30 个独立算子代价函数，覆盖注意力投影、Lightning Index、MoE、mHC 等
 - **显存分析**：KV Cache 大小和每卡权重显存
 - **CSV 导出**：带时间戳的输出目录，包含逐算子、逐层、显存和汇总 CSV
@@ -67,17 +67,19 @@ output/                   # 自动生成：带时间戳的运行结果，包含 
 
 ### 添加新硬件配置
 创建新的 `configs/device_xxx.json`，字段对应 `HardwareConfig`：
-- `bf16_tflops`、`vec_tflops`、`hbm_capacity_gb`、`hbm_bandwidth_gbps`
+- `cube_tflops`、`vec_tflops`、`hbm_capacity_gb`、`hbm_bandwidth_gbps`
 - `flops_utilization`、`hbm_bw_utilization`
 
 ### 添加新模型配置
 创建新的 `configs/model_xxx.json`。关键字段：`compress_ratios` 必须是长度为 `num_layers` 的列表，指定每层的压缩比（1 = 全注意力）。
 
 ### 填充 KV 压缩占位符
-在 `perf_model/ops.py` 中，以下三个函数返回零开销，需用户根据实际压缩算法填充：
-- `op_kv_compression_prefill()` — Prefill 阶段的压缩算法开销
+在 `perf_model/ops.py` 中，以下函数仍返回零开销，需用户根据实际压缩算法填充：
 - `op_kv_compression_decode()` — Decode 阶段的每步摊销开销
-- `op_index_kv_compression()` — 索引键压缩开销
+
+以下 Prefill 压缩算子已实现：
+- `op_kv_compression_prefill()` — K 和 V 缓存压缩（4 次投影 + 分组压缩，K/V 各一次）
+- `op_index_kv_compression()` — Lightning Index 的索引键压缩（4 次投影 + 分组压缩）
 
 ## 关键假设
 
@@ -86,5 +88,6 @@ output/                   # 自动生成：带时间戳的运行结果，包含 
 - 哈希路由层的 MoE 负载均衡因子 = 1.0，其他层可配置
 - 共享专家可与路由专家完全重叠计算（可配置）
 - 通信建模为叠加模式（不与计算重叠）
+- SP（序列并行）在 Prefill 阶段的每个 T_sp -> T_full 转换点插入 AllGather（注意力之前、MoE 前后、LM Head 之前）
 - 单批次 Decode 时 SP 无收益（T=1）
 - DP 将全局批次均匀分配；每卡批次 = batch_size / dp

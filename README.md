@@ -6,7 +6,7 @@ A roofline-based performance model for estimating DeepSeek V4 inference latency 
 
 - **Roofline model**: Each operation tracks cube (matmul), vector, and memory time separately; bottleneck = argmax
 - **Parallelism**: Models TP (Tensor Parallel), DP (Data Parallel), EP (Expert Parallel), and SP (Sequence Parallel)
-- **Communication analysis**: AllReduce and AllToAll cost estimation; comm vs compute breakdown per layer and per phase
+- **Communication analysis**: AllReduce, AllToAll, and AllGather cost estimation; comm vs compute breakdown per layer and per phase
 - **Per-op breakdown**: ~30 individual operation cost functions covering attention projections, Lightning Index, MoE, mHC, and more
 - **Memory analysis**: KV cache sizing and weight memory per rank
 - **CSV export**: Timestamped output directory with per-op, per-layer, memory, and summary CSVs
@@ -67,17 +67,19 @@ The data flow follows a simple pipeline:
 
 ### Adding new hardware configs
 Create a new `configs/device_xxx.json` with fields matching `HardwareConfig`:
-- `bf16_tflops`, `vec_tflops`, `hbm_capacity_gb`, `hbm_bandwidth_gbps`
+- `cube_tflops`, `vec_tflops`, `hbm_capacity_gb`, `hbm_bandwidth_gbps`
 - `flops_utilization`, `hbm_bw_utilization`
 
 ### Adding new model configs
 Create a new `configs/model_xxx.json`. Key field: `compress_ratios` must be a list of length `num_layers` specifying the compression ratio per layer (1 = full attention).
 
 ### Filling in KV compression placeholders
-In `perf_model/ops.py`, three functions return zero profiles and are meant to be filled in:
-- `op_kv_compression_prefill()` — compression algorithm cost during prefill
+In `perf_model/ops.py`, the following function still returns a zero profile and is meant to be filled in:
 - `op_kv_compression_decode()` — amortized per-step cost during decode
-- `op_index_kv_compression()` — index key compression cost
+
+The prefill compression ops are already implemented:
+- `op_kv_compression_prefill()` — K and V cache compression (4 projections + group compression, x2 for K and V)
+- `op_index_kv_compression()` — index key compression for Lightning Index (4 projections + group compression)
 
 ## Key Assumptions
 
@@ -86,8 +88,6 @@ In `perf_model/ops.py`, three functions return zero profiles and are meant to be
 - MoE load balance factor = 1.0 for hash-routing layers, configurable for others
 - Shared expert can fully overlap with routed expert computation (configurable)
 - Communication modeled as additive (not overlapped with compute)
+- SP (Sequence Parallel) inserts AllGather at every T_sp -> T_full transition in prefill (before attention, before/after MoE, before LM head)
 - Single-batch decode: SP provides no benefit (T=1)
 - DP splits global batch evenly; per-rank batch = batch_size / dp
-
-# TODO
-CLAUDE: add description in README.md about how to do TP, especially for mHC and Attention layer.
