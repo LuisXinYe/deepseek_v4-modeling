@@ -85,6 +85,7 @@ class RuntimeConfig:
     moe_load_balance_factor: float = 1.2
     output_len: int = 256
     shared_expert_overlapped: bool = True
+    mhc_sp: bool = False
 
 
 @dataclass

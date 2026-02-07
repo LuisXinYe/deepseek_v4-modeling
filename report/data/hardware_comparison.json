@@ -1,0 +1,248 @@
+{
+  "8K_4K": {
+    "prefill_latency": {
+      "910C": {
+        "tp": 8,
+        "ep": 64,
+        "dp": 8,
+        "batch_size": 8,
+        "gpus": 64,
+        "metric": 1286.1,
+        "unit": "ms"
+      },
+      "H20": {
+        "tp": 8,
+        "ep": 64,
+        "dp": 8,
+        "batch_size": 8,
+        "gpus": 64,
+        "metric": 984.45,
+        "unit": "ms"
+      }
+    },
+    "prefill_throughput": {
+      "910C": {
+        "tp": 8,
+        "ep": 16,
+        "dp": 2,
+        "batch_size": 256,
+        "gpus": 16,
+        "metric": 404.5,
+        "unit": "tps/gpu"
+      },
+      "H20": {
+        "tp": 8,
+        "ep": 8,
+        "dp": 1,
+        "batch_size": 128,
+        "gpus": 8,
+        "metric": 1040.16,
+        "unit": "tps/gpu"
+      }
+    },
+    "decode_latency": {
+      "910C": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 8,
+        "gpus": 32,
+        "metric": 19.382,
+        "unit": "ms"
+      },
+      "H20": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 8,
+        "gpus": 32,
+        "metric": 9.072,
+        "unit": "ms"
+      }
+    },
+    "decode_throughput": {
+      "910C": {
+        "tp": 4,
+        "ep": 16,
+        "dp": 4,
+        "batch_size": 512,
+        "gpus": 16,
+        "metric": 135.306,
+        "unit": "tps/gpu"
+      },
+      "H20": {
+        "tp": 8,
+        "ep": 16,
+        "dp": 2,
+        "batch_size": 512,
+        "gpus": 16,
+        "metric": 207.696,
+        "unit": "tps/gpu"
+      }
+    }
+  },
+  "128K_4K": {
+    "prefill_latency": {
+      "910C": {
+        "tp": 8,
+        "ep": 64,
+        "dp": 8,
+        "batch_size": 8,
+        "gpus": 64,
+        "metric": 26051.47,
+        "unit": "ms"
+      },
+      "H20": {
+        "tp": 8,
+        "ep": 64,
+        "dp": 8,
+        "batch_size": 8,
+        "gpus": 64,
+        "metric": 27282.73,
+        "unit": "ms"
+      }
+    },
+    "prefill_throughput": {
+      "910C": {
+        "tp": 8,
+        "ep": 16,
+        "dp": 2,
+        "batch_size": 16,
+        "gpus": 16,
+        "metric": 314.02,
+        "unit": "tps/gpu"
+      },
+      "H20": {
+        "tp": 8,
+        "ep": 8,
+        "dp": 1,
+        "batch_size": 8,
+        "gpus": 8,
+        "metric": 597.41,
+        "unit": "tps/gpu"
+      }
+    },
+    "decode_latency": {
+      "910C": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 8,
+        "gpus": 32,
+        "metric": 21.152,
+        "unit": "ms"
+      },
+      "H20": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 8,
+        "gpus": 32,
+        "metric": 9.934,
+        "unit": "ms"
+      }
+    },
+    "decode_throughput": {
+      "910C": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 128,
+        "gpus": 32,
+        "metric": 15.693,
+        "unit": "tps/gpu"
+      },
+      "H20": {
+        "tp": 4,
+        "ep": 16,
+        "dp": 4,
+        "batch_size": 64,
+        "gpus": 16,
+        "metric": 45.624,
+        "unit": "tps/gpu"
+      }
+    }
+  },
+  "256K_4K": {
+    "prefill_latency": {
+      "910C": {
+        "tp": 8,
+        "ep": 64,
+        "dp": 8,
+        "batch_size": 8,
+        "gpus": 64,
+        "metric": 64532.33,
+        "unit": "ms"
+      },
+      "H20": {
+        "tp": 8,
+        "ep": 64,
+        "dp": 8,
+        "batch_size": 8,
+        "gpus": 64,
+        "metric": 79459.45,
+        "unit": "ms"
+      }
+    },
+    "prefill_throughput": {
+      "910C": {
+        "tp": 8,
+        "ep": 16,
+        "dp": 2,
+        "batch_size": 8,
+        "gpus": 16,
+        "metric": 253.53,
+        "unit": "tps/gpu"
+      },
+      "H20": {
+        "tp": 8,
+        "ep": 8,
+        "dp": 1,
+        "batch_size": 4,
+        "gpus": 8,
+        "metric": 410.87,
+        "unit": "tps/gpu"
+      }
+    },
+    "decode_latency": {
+      "910C": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 8,
+        "gpus": 32,
+        "metric": 21.666,
+        "unit": "ms"
+      },
+      "H20": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 8,
+        "gpus": 32,
+        "metric": 10.171,
+        "unit": "ms"
+      }
+    },
+    "decode_throughput": {
+      "910C": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 64,
+        "gpus": 32,
+        "metric": 8.259,
+        "unit": "tps/gpu"
+      },
+      "H20": {
+        "tp": 4,
+        "ep": 16,
+        "dp": 4,
+        "batch_size": 32,
+        "gpus": 16,
+        "metric": 24.619,
+        "unit": "tps/gpu"
+      }
+    }
+  }
+}

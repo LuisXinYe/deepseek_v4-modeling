@@ -41,11 +41,12 @@ def prefill_layer(layer_idx: int, cfg: Config) -> LayerProfile:
     ratio = cfg.model.compress_ratios[layer_idx]
     T_full = B * S
     T_sp = B * S // TP if cfg.rt.sp else T_full
+    T_mhc = T_sp if (cfg.rt.sp and cfg.rt.mhc_sp) else T_full
 
     ops = []
 
     # mHC pre-attention
-    ops.append(op_mhc_pre(T_full, cfg, "mhc_pre_attn"))
+    ops.append(op_mhc_pre(T_mhc, cfg, "mhc_pre_attn"))
 
     # RMSNorm (in SP region)
     ops.append(op_rmsnorm(T_sp, cfg, "rmsnorm_attn"))
@@ -92,11 +93,11 @@ def prefill_layer(layer_idx: int, cfg: Config) -> LayerProfile:
     ops.append(op_attn_tp_allreduce(T_full, cfg))
 
     # mHC post-attention: sinkhorn + post
-    ops.append(op_mhc_sinkhorn(T_full, cfg, "sinkhorn_attn"))
-    ops.append(op_mhc_post(T_full, cfg, "mhc_post_attn"))
+    ops.append(op_mhc_sinkhorn(T_mhc, cfg, "sinkhorn_attn"))
+    ops.append(op_mhc_post(T_mhc, cfg, "mhc_post_attn"))
 
     # mHC pre-MoE
-    ops.append(op_mhc_pre(T_full, cfg, "mhc_pre_moe"))
+    ops.append(op_mhc_pre(T_mhc, cfg, "mhc_pre_moe"))
 
     # RMSNorm (in SP region)
     ops.append(op_rmsnorm(T_sp, cfg, "rmsnorm_moe"))
@@ -120,20 +121,20 @@ def prefill_layer(layer_idx: int, cfg: Config) -> LayerProfile:
         ops.append(op_moe_ep_combine(T_sp, layer_idx, cfg))
         combine_time = ops[-1].time_s
         routed_comm = dispatch_op.time_s +  combine_time
-        if shared_time > routed_comm: 
+        if shared_time > routed_comm:
             excess = shared_time - routed_comm
             ops.append(OpProfile(name="shared_expert_excess", time_s=excess))
     else:
         ops.extend(routed_ops)
         ops.append(op_moe_ep_combine(T_sp, layer_idx, cfg))
         ops.extend(shared_ops)
-        
+
     # SP AllGather: T_sp -> T_full after MoE combine
     ops.append(op_sp_allgather(T_sp, cfg, "sp_ag_after_moe"))
 
     # mHC post-MoE: sinkhorn + post
-    ops.append(op_mhc_sinkhorn(T_full, cfg, "sinkhorn_moe"))
-    ops.append(op_mhc_post(T_full, cfg, "mhc_post_moe"))
+    ops.append(op_mhc_sinkhorn(T_mhc, cfg, "sinkhorn_moe"))
+    ops.append(op_mhc_post(T_mhc, cfg, "mhc_post_moe"))
 
     lp = LayerProfile(layer_idx=layer_idx, ratio=ratio, ops=ops)
     lp.compute_total()

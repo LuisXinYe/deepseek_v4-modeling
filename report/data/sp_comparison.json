@@ -1,0 +1,1332 @@
+{
+  "910C": {
+    "8K_4K": {
+      "no_SP": {
+        "prefill_time_ms": 11159.304657306457,
+        "sp": false,
+        "mhc_sp": false,
+        "category_breakdown": {
+          "Attention Proj": {
+            "time_s": 0.6287101063080842,
+            "time_ms": 628.7101063080842,
+            "pct": 5.63,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Attention Compute": {
+            "time_s": 0.19226832320817028,
+            "time_ms": 192.26832320817027,
+            "pct": 1.72,
+            "dominant_bottleneck": "CUBE"
+          },
+          "KV Compression": {
+            "time_s": 0.06006000147608513,
+            "time_ms": 60.060001476085134,
+            "pct": 0.54,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Lightning Index": {
+            "time_s": 0.1212238961783829,
+            "time_ms": 121.2238961783829,
+            "pct": 1.09,
+            "dominant_bottleneck": "COMM"
+          },
+          "mHC": {
+            "time_s": 8.550020255288862,
+            "time_ms": 8550.020255288862,
+            "pct": 76.62,
+            "dominant_bottleneck": "MEM"
+          },
+          "MoE Gate": {
+            "time_s": 0.03143550531540426,
+            "time_ms": 31.43550531540426,
+            "pct": 0.28,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Routed": {
+            "time_s": 0.34625121798536235,
+            "time_ms": 346.25121798536236,
+            "pct": 3.1,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Shared": {
+            "time_s": 0.0,
+            "time_ms": 0.0,
+            "pct": 0.0,
+            "dominant_bottleneck": "N/A"
+          },
+          "Communication": {
+            "time_s": 1.1179425697959193,
+            "time_ms": 1117.9425697959193,
+            "pct": 10.02,
+            "dominant_bottleneck": "COMM"
+          },
+          "Norm": {
+            "time_s": 0.06487190186666673,
+            "time_ms": 64.87190186666673,
+            "pct": 0.58,
+            "dominant_bottleneck": "MEM"
+          },
+          "Embedding/LMHead": {
+            "time_s": 0.04652087988349882,
+            "time_ms": 46.520879883498814,
+            "pct": 0.42,
+            "dominant_bottleneck": "CUBE"
+          }
+        }
+      },
+      "SP_only": {
+        "prefill_time_ms": 10143.94964172165,
+        "sp": true,
+        "mhc_sp": false,
+        "category_breakdown": {
+          "Attention Proj": {
+            "time_s": 0.6287101063080842,
+            "time_ms": 628.7101063080842,
+            "pct": 6.2,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Attention Compute": {
+            "time_s": 0.19226832320817028,
+            "time_ms": 192.26832320817027,
+            "pct": 1.9,
+            "dominant_bottleneck": "CUBE"
+          },
+          "KV Compression": {
+            "time_s": 0.06006000147608513,
+            "time_ms": 60.060001476085134,
+            "pct": 0.59,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Lightning Index": {
+            "time_s": 0.1212238961783829,
+            "time_ms": 121.2238961783829,
+            "pct": 1.2,
+            "dominant_bottleneck": "COMM"
+          },
+          "mHC": {
+            "time_s": 8.550020255288862,
+            "time_ms": 8550.020255288862,
+            "pct": 84.29,
+            "dominant_bottleneck": "MEM"
+          },
+          "MoE Gate": {
+            "time_s": 0.03143550531540426,
+            "time_ms": 31.43550531540426,
+            "pct": 0.31,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Routed": {
+            "time_s": 0.04328140224817029,
+            "time_ms": 43.281402248170295,
+            "pct": 0.43,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Shared": {
+            "time_s": 0.0,
+            "time_ms": 0.0,
+            "pct": 0.0,
+            "dominant_bottleneck": "N/A"
+          },
+          "Communication": {
+            "time_s": 0.4623202840816309,
+            "time_ms": 462.3202840816309,
+            "pct": 4.56,
+            "dominant_bottleneck": "COMM"
+          },
+          "Norm": {
+            "time_s": 0.008108987733333342,
+            "time_ms": 8.108987733333342,
+            "pct": 0.08,
+            "dominant_bottleneck": "MEM"
+          },
+          "Embedding/LMHead": {
+            "time_s": 0.04652087988349882,
+            "time_ms": 46.520879883498814,
+            "pct": 0.46,
+            "dominant_bottleneck": "CUBE"
+          }
+        }
+      },
+      "SP_mHC_SP": {
+        "prefill_time_ms": 2662.681918343873,
+        "sp": true,
+        "mhc_sp": true,
+        "category_breakdown": {
+          "Attention Proj": {
+            "time_s": 0.6287101063080842,
+            "time_ms": 628.7101063080842,
+            "pct": 23.61,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Attention Compute": {
+            "time_s": 0.19226832320817028,
+            "time_ms": 192.26832320817027,
+            "pct": 7.22,
+            "dominant_bottleneck": "CUBE"
+          },
+          "KV Compression": {
+            "time_s": 0.06006000147608513,
+            "time_ms": 60.060001476085134,
+            "pct": 2.26,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Lightning Index": {
+            "time_s": 0.1212238961783829,
+            "time_ms": 121.2238961783829,
+            "pct": 4.55,
+            "dominant_bottleneck": "COMM"
+          },
+          "mHC": {
+            "time_s": 1.0687525319111078,
+            "time_ms": 1068.7525319111078,
+            "pct": 40.14,
+            "dominant_bottleneck": "MEM"
+          },
+          "MoE Gate": {
+            "time_s": 0.03143550531540426,
+            "time_ms": 31.43550531540426,
+            "pct": 1.18,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Routed": {
+            "time_s": 0.04328140224817029,
+            "time_ms": 43.281402248170295,
+            "pct": 1.63,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Shared": {
+            "time_s": 0.0,
+            "time_ms": 0.0,
+            "pct": 0.0,
+            "dominant_bottleneck": "N/A"
+          },
+          "Communication": {
+            "time_s": 0.4623202840816309,
+            "time_ms": 462.3202840816309,
+            "pct": 17.36,
+            "dominant_bottleneck": "COMM"
+          },
+          "Norm": {
+            "time_s": 0.008108987733333342,
+            "time_ms": 8.108987733333342,
+            "pct": 0.3,
+            "dominant_bottleneck": "MEM"
+          },
+          "Embedding/LMHead": {
+            "time_s": 0.04652087988349882,
+            "time_ms": 46.520879883498814,
+            "pct": 1.75,
+            "dominant_bottleneck": "CUBE"
+          }
+        }
+      }
+    },
+    "128K_4K": {
+      "no_SP": {
+        "prefill_time_ms": 225082.5565089372,
+        "sp": false,
+        "mhc_sp": false,
+        "category_breakdown": {
+          "Attention Proj": {
+            "time_s": 10.059361700929347,
+            "time_ms": 10059.361700929347,
+            "pct": 4.47,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Attention Compute": {
+            "time_s": 27.28894284682346,
+            "time_ms": 27288.94284682346,
+            "pct": 12.12,
+            "dominant_bottleneck": "CUBE"
+          },
+          "KV Compression": {
+            "time_s": 0.9609600236173621,
+            "time_ms": 960.9600236173621,
+            "pct": 0.43,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Lightning Index": {
+            "time_s": 24.363814655395398,
+            "time_ms": 24363.8146553954,
+            "pct": 10.82,
+            "dominant_bottleneck": "COMM"
+          },
+          "mHC": {
+            "time_s": 136.8003240846218,
+            "time_ms": 136800.3240846218,
+            "pct": 60.78,
+            "dominant_bottleneck": "MEM"
+          },
+          "MoE Gate": {
+            "time_s": 0.5029680850464682,
+            "time_ms": 502.96808504646816,
+            "pct": 0.22,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Routed": {
+            "time_s": 5.540019487765798,
+            "time_ms": 5540.019487765798,
+            "pct": 2.46,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Shared": {
+            "time_s": 0.0,
+            "time_ms": 0.0,
+            "pct": 0.0,
+            "dominant_bottleneck": "N/A"
+          },
+          "Communication": {
+            "time_s": 17.783881116734666,
+            "time_ms": 17783.881116734665,
+            "pct": 7.9,
+            "dominant_bottleneck": "COMM"
+          },
+          "Norm": {
+            "time_s": 1.0379504298666677,
+            "time_ms": 1037.9504298666677,
+            "pct": 0.46,
+            "dominant_bottleneck": "MEM"
+          },
+          "Embedding/LMHead": {
+            "time_s": 0.7443340781359811,
+            "time_ms": 744.334078135981,
+            "pct": 0.33,
+            "dominant_bottleneck": "CUBE"
+          }
+        }
+      },
+      "SP_only": {
+        "prefill_time_ms": 208700.37625958046,
+        "sp": true,
+        "mhc_sp": false,
+        "category_breakdown": {
+          "Attention Proj": {
+            "time_s": 10.059361700929347,
+            "time_ms": 10059.361700929347,
+            "pct": 4.82,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Attention Compute": {
+            "time_s": 27.28894284682346,
+            "time_ms": 27288.94284682346,
+            "pct": 13.08,
+            "dominant_bottleneck": "CUBE"
+          },
+          "KV Compression": {
+            "time_s": 0.9609600236173621,
+            "time_ms": 960.9600236173621,
+            "pct": 0.46,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Lightning Index": {
+            "time_s": 24.363814655395398,
+            "time_ms": 24363.8146553954,
+            "pct": 11.67,
+            "dominant_bottleneck": "COMM"
+          },
+          "mHC": {
+            "time_s": 136.8003240846218,
+            "time_ms": 136800.3240846218,
+            "pct": 65.55,
+            "dominant_bottleneck": "MEM"
+          },
+          "MoE Gate": {
+            "time_s": 0.5029680850464682,
+            "time_ms": 502.96808504646816,
+            "pct": 0.24,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Routed": {
+            "time_s": 0.6925024359707247,
+            "time_ms": 692.5024359707247,
+            "pct": 0.33,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Shared": {
+            "time_s": 0.0,
+            "time_ms": 0.0,
+            "pct": 0.0,
+            "dominant_bottleneck": "N/A"
+          },
+          "Communication": {
+            "time_s": 7.157424545306132,
+            "time_ms": 7157.424545306131,
+            "pct": 3.43,
+            "dominant_bottleneck": "COMM"
+          },
+          "Norm": {
+            "time_s": 0.12974380373333347,
+            "time_ms": 129.74380373333346,
+            "pct": 0.06,
+            "dominant_bottleneck": "MEM"
+          },
+          "Embedding/LMHead": {
+            "time_s": 0.7443340781359811,
+            "time_ms": 744.334078135981,
+            "pct": 0.36,
+            "dominant_bottleneck": "CUBE"
+          }
+        }
+      },
+      "SP_mHC_SP": {
+        "prefill_time_ms": 89000.09268553607,
+        "sp": true,
+        "mhc_sp": true,
+        "category_breakdown": {
+          "Attention Proj": {
+            "time_s": 10.059361700929347,
+            "time_ms": 10059.361700929347,
+            "pct": 11.3,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Attention Compute": {
+            "time_s": 27.28894284682346,
+            "time_ms": 27288.94284682346,
+            "pct": 30.66,
+            "dominant_bottleneck": "CUBE"
+          },
+          "KV Compression": {
+            "time_s": 0.9609600236173621,
+            "time_ms": 960.9600236173621,
+            "pct": 1.08,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Lightning Index": {
+            "time_s": 24.363814655395398,
+            "time_ms": 24363.8146553954,
+            "pct": 27.38,
+            "dominant_bottleneck": "COMM"
+          },
+          "mHC": {
+            "time_s": 17.100040510577724,
+            "time_ms": 17100.040510577724,
+            "pct": 19.21,
+            "dominant_bottleneck": "MEM"
+          },
+          "MoE Gate": {
+            "time_s": 0.5029680850464682,
+            "time_ms": 502.96808504646816,
+            "pct": 0.57,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Routed": {
+            "time_s": 0.6925024359707247,
+            "time_ms": 692.5024359707247,
+            "pct": 0.78,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Shared": {
+            "time_s": 0.0,
+            "time_ms": 0.0,
+            "pct": 0.0,
+            "dominant_bottleneck": "N/A"
+          },
+          "Communication": {
+            "time_s": 7.157424545306132,
+            "time_ms": 7157.424545306131,
+            "pct": 8.04,
+            "dominant_bottleneck": "COMM"
+          },
+          "Norm": {
+            "time_s": 0.12974380373333347,
+            "time_ms": 129.74380373333346,
+            "pct": 0.15,
+            "dominant_bottleneck": "MEM"
+          },
+          "Embedding/LMHead": {
+            "time_s": 0.7443340781359811,
+            "time_ms": 744.334078135981,
+            "pct": 0.84,
+            "dominant_bottleneck": "CUBE"
+          }
+        }
+      }
+    },
+    "256K_4K": {
+      "no_SP": {
+        "prefill_time_ms": 274875.8486348401,
+        "sp": false,
+        "mhc_sp": false,
+        "category_breakdown": {
+          "Attention Proj": {
+            "time_s": 10.059361700929347,
+            "time_ms": 10059.361700929347,
+            "pct": 3.66,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Attention Compute": {
+            "time_s": 53.11576916734905,
+            "time_ms": 53115.76916734905,
+            "pct": 19.32,
+            "dominant_bottleneck": "CUBE"
+          },
+          "KV Compression": {
+            "time_s": 0.9609600236173621,
+            "time_ms": 960.9600236173621,
+            "pct": 0.35,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Lightning Index": {
+            "time_s": 48.33028046077276,
+            "time_ms": 48330.28046077276,
+            "pct": 17.58,
+            "dominant_bottleneck": "COMM"
+          },
+          "mHC": {
+            "time_s": 136.8003240846218,
+            "time_ms": 136800.3240846218,
+            "pct": 49.77,
+            "dominant_bottleneck": "MEM"
+          },
+          "MoE Gate": {
+            "time_s": 0.5029680850464682,
+            "time_ms": 502.96808504646816,
+            "pct": 0.18,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Routed": {
+            "time_s": 5.540019487765798,
+            "time_ms": 5540.019487765798,
+            "pct": 2.02,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Shared": {
+            "time_s": 0.0,
+            "time_ms": 0.0,
+            "pct": 0.0,
+            "dominant_bottleneck": "N/A"
+          },
+          "Communication": {
+            "time_s": 17.783881116734666,
+            "time_ms": 17783.881116734665,
+            "pct": 6.47,
+            "dominant_bottleneck": "COMM"
+          },
+          "Norm": {
+            "time_s": 1.0379504298666677,
+            "time_ms": 1037.9504298666677,
+            "pct": 0.38,
+            "dominant_bottleneck": "MEM"
+          },
+          "Embedding/LMHead": {
+            "time_s": 0.7443340781359811,
+            "time_ms": 744.334078135981,
+            "pct": 0.27,
+            "dominant_bottleneck": "CUBE"
+          }
+        }
+      },
+      "SP_only": {
+        "prefill_time_ms": 258493.66838548338,
+        "sp": true,
+        "mhc_sp": false,
+        "category_breakdown": {
+          "Attention Proj": {
+            "time_s": 10.059361700929347,
+            "time_ms": 10059.361700929347,
+            "pct": 3.89,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Attention Compute": {
+            "time_s": 53.11576916734905,
+            "time_ms": 53115.76916734905,
+            "pct": 20.55,
+            "dominant_bottleneck": "CUBE"
+          },
+          "KV Compression": {
+            "time_s": 0.9609600236173621,
+            "time_ms": 960.9600236173621,
+            "pct": 0.37,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Lightning Index": {
+            "time_s": 48.33028046077276,
+            "time_ms": 48330.28046077276,
+            "pct": 18.7,
+            "dominant_bottleneck": "COMM"
+          },
+          "mHC": {
+            "time_s": 136.8003240846218,
+            "time_ms": 136800.3240846218,
+            "pct": 52.92,
+            "dominant_bottleneck": "MEM"
+          },
+          "MoE Gate": {
+            "time_s": 0.5029680850464682,
+            "time_ms": 502.96808504646816,
+            "pct": 0.19,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Routed": {
+            "time_s": 0.6925024359707247,
+            "time_ms": 692.5024359707247,
+            "pct": 0.27,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Shared": {
+            "time_s": 0.0,
+            "time_ms": 0.0,
+            "pct": 0.0,
+            "dominant_bottleneck": "N/A"
+          },
+          "Communication": {
+            "time_s": 7.157424545306132,
+            "time_ms": 7157.424545306131,
+            "pct": 2.77,
+            "dominant_bottleneck": "COMM"
+          },
+          "Norm": {
+            "time_s": 0.12974380373333347,
+            "time_ms": 129.74380373333346,
+            "pct": 0.05,
+            "dominant_bottleneck": "MEM"
+          },
+          "Embedding/LMHead": {
+            "time_s": 0.7443340781359811,
+            "time_ms": 744.334078135981,
+            "pct": 0.29,
+            "dominant_bottleneck": "CUBE"
+          }
+        }
+      },
+      "SP_mHC_SP": {
+        "prefill_time_ms": 138793.3848114391,
+        "sp": true,
+        "mhc_sp": true,
+        "category_breakdown": {
+          "Attention Proj": {
+            "time_s": 10.059361700929347,
+            "time_ms": 10059.361700929347,
+            "pct": 7.25,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Attention Compute": {
+            "time_s": 53.11576916734905,
+            "time_ms": 53115.76916734905,
+            "pct": 38.27,
+            "dominant_bottleneck": "CUBE"
+          },
+          "KV Compression": {
+            "time_s": 0.9609600236173621,
+            "time_ms": 960.9600236173621,
+            "pct": 0.69,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Lightning Index": {
+            "time_s": 48.33028046077276,
+            "time_ms": 48330.28046077276,
+            "pct": 34.82,
+            "dominant_bottleneck": "COMM"
+          },
+          "mHC": {
+            "time_s": 17.100040510577724,
+            "time_ms": 17100.040510577724,
+            "pct": 12.32,
+            "dominant_bottleneck": "MEM"
+          },
+          "MoE Gate": {
+            "time_s": 0.5029680850464682,
+            "time_ms": 502.96808504646816,
+            "pct": 0.36,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Routed": {
+            "time_s": 0.6925024359707247,
+            "time_ms": 692.5024359707247,
+            "pct": 0.5,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Shared": {
+            "time_s": 0.0,
+            "time_ms": 0.0,
+            "pct": 0.0,
+            "dominant_bottleneck": "N/A"
+          },
+          "Communication": {
+            "time_s": 7.157424545306132,
+            "time_ms": 7157.424545306131,
+            "pct": 5.16,
+            "dominant_bottleneck": "COMM"
+          },
+          "Norm": {
+            "time_s": 0.12974380373333347,
+            "time_ms": 129.74380373333346,
+            "pct": 0.09,
+            "dominant_bottleneck": "MEM"
+          },
+          "Embedding/LMHead": {
+            "time_s": 0.7443340781359811,
+            "time_ms": 744.334078135981,
+            "pct": 0.54,
+            "dominant_bottleneck": "CUBE"
+          }
+        }
+      }
+    }
+  },
+  "H20": {
+    "8K_4K": {
+      "no_SP": {
+        "prefill_time_ms": 15181.23770153783,
+        "sp": false,
+        "mhc_sp": false,
+        "category_breakdown": {
+          "Attention Proj": {
+            "time_s": 1.5972635133232431,
+            "time_ms": 1597.2635133232432,
+            "pct": 10.52,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Attention Compute": {
+            "time_s": 0.4884654697721074,
+            "time_ms": 488.46546977210744,
+            "pct": 3.22,
+            "dominant_bottleneck": "CUBE"
+          },
+          "KV Compression": {
+            "time_s": 0.15258486861491888,
+            "time_ms": 152.5848686149189,
+            "pct": 1.01,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Lightning Index": {
+            "time_s": 0.19524142243401799,
+            "time_ms": 195.24142243401798,
+            "pct": 1.29,
+            "dominant_bottleneck": "CUBE"
+          },
+          "mHC": {
+            "time_s": 3.847509114879989,
+            "time_ms": 3847.5091148799893,
+            "pct": 25.34,
+            "dominant_bottleneck": "MEM"
+          },
+          "MoE Gate": {
+            "time_s": 0.07986317566616209,
+            "time_ms": 79.86317566616209,
+            "pct": 0.53,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Routed": {
+            "time_s": 0.8573059319974081,
+            "time_ms": 857.3059319974082,
+            "pct": 5.65,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Shared": {
+            "time_s": 0.0,
+            "time_ms": 0.0,
+            "pct": 0.0,
+            "dominant_bottleneck": "N/A"
+          },
+          "Communication": {
+            "time_s": 7.816403077688907,
+            "time_ms": 7816.403077688907,
+            "pct": 51.49,
+            "dominant_bottleneck": "COMM"
+          },
+          "Norm": {
+            "time_s": 0.029192355839999965,
+            "time_ms": 29.192355839999966,
+            "pct": 0.19,
+            "dominant_bottleneck": "MEM"
+          },
+          "Embedding/LMHead": {
+            "time_s": 0.11740877132108107,
+            "time_ms": 117.40877132108108,
+            "pct": 0.77,
+            "dominant_bottleneck": "CUBE"
+          }
+        }
+      },
+      "SP_only": {
+        "prefill_time_ms": 7841.588618791207,
+        "sp": true,
+        "mhc_sp": false,
+        "category_breakdown": {
+          "Attention Proj": {
+            "time_s": 1.5972635133232431,
+            "time_ms": 1597.2635133232432,
+            "pct": 20.37,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Attention Compute": {
+            "time_s": 0.4884654697721074,
+            "time_ms": 488.46546977210744,
+            "pct": 6.23,
+            "dominant_bottleneck": "CUBE"
+          },
+          "KV Compression": {
+            "time_s": 0.15258486861491888,
+            "time_ms": 152.5848686149189,
+            "pct": 1.95,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Lightning Index": {
+            "time_s": 0.19524142243401799,
+            "time_ms": 195.24142243401798,
+            "pct": 2.49,
+            "dominant_bottleneck": "CUBE"
+          },
+          "mHC": {
+            "time_s": 3.847509114879989,
+            "time_ms": 3847.5091148799893,
+            "pct": 49.07,
+            "dominant_bottleneck": "MEM"
+          },
+          "MoE Gate": {
+            "time_s": 0.07986317566616209,
+            "time_ms": 79.86317566616209,
+            "pct": 1.02,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Routed": {
+            "time_s": 0.10716324149967602,
+            "time_ms": 107.16324149967602,
+            "pct": 1.37,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Shared": {
+            "time_s": 0.0,
+            "time_ms": 0.0,
+            "pct": 0.0,
+            "dominant_bottleneck": "N/A"
+          },
+          "Communication": {
+            "time_s": 1.2524399967999975,
+            "time_ms": 1252.4399967999975,
+            "pct": 15.97,
+            "dominant_bottleneck": "COMM"
+          },
+          "Norm": {
+            "time_s": 0.0036490444799999956,
+            "time_ms": 3.6490444799999957,
+            "pct": 0.05,
+            "dominant_bottleneck": "MEM"
+          },
+          "Embedding/LMHead": {
+            "time_s": 0.11740877132108107,
+            "time_ms": 117.40877132108108,
+            "pct": 1.5,
+            "dominant_bottleneck": "CUBE"
+          }
+        }
+      },
+      "SP_mHC_SP": {
+        "prefill_time_ms": 4475.018143271205,
+        "sp": true,
+        "mhc_sp": true,
+        "category_breakdown": {
+          "Attention Proj": {
+            "time_s": 1.5972635133232431,
+            "time_ms": 1597.2635133232432,
+            "pct": 35.69,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Attention Compute": {
+            "time_s": 0.4884654697721074,
+            "time_ms": 488.46546977210744,
+            "pct": 10.92,
+            "dominant_bottleneck": "CUBE"
+          },
+          "KV Compression": {
+            "time_s": 0.15258486861491888,
+            "time_ms": 152.5848686149189,
+            "pct": 3.41,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Lightning Index": {
+            "time_s": 0.19524142243401799,
+            "time_ms": 195.24142243401798,
+            "pct": 4.36,
+            "dominant_bottleneck": "CUBE"
+          },
+          "mHC": {
+            "time_s": 0.48093863935999864,
+            "time_ms": 480.93863935999866,
+            "pct": 10.75,
+            "dominant_bottleneck": "MEM"
+          },
+          "MoE Gate": {
+            "time_s": 0.07986317566616209,
+            "time_ms": 79.86317566616209,
+            "pct": 1.78,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Routed": {
+            "time_s": 0.10716324149967602,
+            "time_ms": 107.16324149967602,
+            "pct": 2.39,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Shared": {
+            "time_s": 0.0,
+            "time_ms": 0.0,
+            "pct": 0.0,
+            "dominant_bottleneck": "N/A"
+          },
+          "Communication": {
+            "time_s": 1.2524399967999975,
+            "time_ms": 1252.4399967999975,
+            "pct": 27.99,
+            "dominant_bottleneck": "COMM"
+          },
+          "Norm": {
+            "time_s": 0.0036490444799999956,
+            "time_ms": 3.6490444799999957,
+            "pct": 0.08,
+            "dominant_bottleneck": "MEM"
+          },
+          "Embedding/LMHead": {
+            "time_s": 0.11740877132108107,
+            "time_ms": 117.40877132108108,
+            "pct": 2.62,
+            "dominant_bottleneck": "CUBE"
+          }
+        }
+      }
+    },
+    "128K_4K": {
+      "no_SP": {
+        "prefill_time_ms": 336214.1228657729,
+        "sp": false,
+        "mhc_sp": false,
+        "category_breakdown": {
+          "Attention Proj": {
+            "time_s": 25.55621621317189,
+            "time_ms": 25556.21621317189,
+            "pct": 7.6,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Attention Compute": {
+            "time_s": 69.32866561084897,
+            "time_ms": 69328.66561084897,
+            "pct": 20.62,
+            "dominant_bottleneck": "CUBE"
+          },
+          "KV Compression": {
+            "time_s": 2.441357897838702,
+            "time_ms": 2441.3578978387022,
+            "pct": 0.73,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Lightning Index": {
+            "time_s": 34.976564305616705,
+            "time_ms": 34976.5643056167,
+            "pct": 10.4,
+            "dominant_bottleneck": "CUBE"
+          },
+          "mHC": {
+            "time_s": 61.560145838079826,
+            "time_ms": 61560.14583807983,
+            "pct": 18.31,
+            "dominant_bottleneck": "MEM"
+          },
+          "MoE Gate": {
+            "time_s": 1.2778108106585935,
+            "time_ms": 1277.8108106585935,
+            "pct": 0.38,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Routed": {
+            "time_s": 13.71689491195853,
+            "time_ms": 13716.89491195853,
+            "pct": 4.08,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Shared": {
+            "time_s": 0.0,
+            "time_ms": 0.0,
+            "pct": 0.0,
+            "dominant_bottleneck": "N/A"
+          },
+          "Communication": {
+            "time_s": 125.01084924302195,
+            "time_ms": 125010.84924302195,
+            "pct": 37.18,
+            "dominant_bottleneck": "COMM"
+          },
+          "Norm": {
+            "time_s": 0.46707769343999944,
+            "time_ms": 467.07769343999945,
+            "pct": 0.14,
+            "dominant_bottleneck": "MEM"
+          },
+          "Embedding/LMHead": {
+            "time_s": 1.8785403411372972,
+            "time_ms": 1878.5403411372972,
+            "pct": 0.56,
+            "dominant_bottleneck": "CUBE"
+          }
+        }
+      },
+      "SP_only": {
+        "prefill_time_ms": 218711.48754182673,
+        "sp": true,
+        "mhc_sp": false,
+        "category_breakdown": {
+          "Attention Proj": {
+            "time_s": 25.55621621317189,
+            "time_ms": 25556.21621317189,
+            "pct": 11.68,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Attention Compute": {
+            "time_s": 69.32866561084897,
+            "time_ms": 69328.66561084897,
+            "pct": 31.7,
+            "dominant_bottleneck": "CUBE"
+          },
+          "KV Compression": {
+            "time_s": 2.441357897838702,
+            "time_ms": 2441.3578978387022,
+            "pct": 1.12,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Lightning Index": {
+            "time_s": 34.976564305616705,
+            "time_ms": 34976.5643056167,
+            "pct": 15.99,
+            "dominant_bottleneck": "CUBE"
+          },
+          "mHC": {
+            "time_s": 61.560145838079826,
+            "time_ms": 61560.14583807983,
+            "pct": 28.15,
+            "dominant_bottleneck": "MEM"
+          },
+          "MoE Gate": {
+            "time_s": 1.2778108106585935,
+            "time_ms": 1277.8108106585935,
+            "pct": 0.58,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Routed": {
+            "time_s": 1.7146118639948162,
+            "time_ms": 1714.6118639948163,
+            "pct": 0.78,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Shared": {
+            "time_s": 0.0,
+            "time_ms": 0.0,
+            "pct": 0.0,
+            "dominant_bottleneck": "N/A"
+          },
+          "Communication": {
+            "time_s": 19.919189948800003,
+            "time_ms": 19919.1899488,
+            "pct": 9.11,
+            "dominant_bottleneck": "COMM"
+          },
+          "Norm": {
+            "time_s": 0.05838471167999993,
+            "time_ms": 58.38471167999993,
+            "pct": 0.03,
+            "dominant_bottleneck": "MEM"
+          },
+          "Embedding/LMHead": {
+            "time_s": 1.8785403411372972,
+            "time_ms": 1878.5403411372972,
+            "pct": 0.86,
+            "dominant_bottleneck": "CUBE"
+          }
+        }
+      },
+      "SP_mHC_SP": {
+        "prefill_time_ms": 164846.35993350693,
+        "sp": true,
+        "mhc_sp": true,
+        "category_breakdown": {
+          "Attention Proj": {
+            "time_s": 25.55621621317189,
+            "time_ms": 25556.21621317189,
+            "pct": 15.5,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Attention Compute": {
+            "time_s": 69.32866561084897,
+            "time_ms": 69328.66561084897,
+            "pct": 42.06,
+            "dominant_bottleneck": "CUBE"
+          },
+          "KV Compression": {
+            "time_s": 2.441357897838702,
+            "time_ms": 2441.3578978387022,
+            "pct": 1.48,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Lightning Index": {
+            "time_s": 34.976564305616705,
+            "time_ms": 34976.5643056167,
+            "pct": 21.22,
+            "dominant_bottleneck": "CUBE"
+          },
+          "mHC": {
+            "time_s": 7.695018229759978,
+            "time_ms": 7695.018229759979,
+            "pct": 4.67,
+            "dominant_bottleneck": "MEM"
+          },
+          "MoE Gate": {
+            "time_s": 1.2778108106585935,
+            "time_ms": 1277.8108106585935,
+            "pct": 0.78,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Routed": {
+            "time_s": 1.7146118639948162,
+            "time_ms": 1714.6118639948163,
+            "pct": 1.04,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Shared": {
+            "time_s": 0.0,
+            "time_ms": 0.0,
+            "pct": 0.0,
+            "dominant_bottleneck": "N/A"
+          },
+          "Communication": {
+            "time_s": 19.919189948800003,
+            "time_ms": 19919.1899488,
+            "pct": 12.08,
+            "dominant_bottleneck": "COMM"
+          },
+          "Norm": {
+            "time_s": 0.05838471167999993,
+            "time_ms": 58.38471167999993,
+            "pct": 0.04,
+            "dominant_bottleneck": "MEM"
+          },
+          "Embedding/LMHead": {
+            "time_s": 1.8785403411372972,
+            "time_ms": 1878.5403411372972,
+            "pct": 1.14,
+            "dominant_bottleneck": "CUBE"
+          }
+        }
+      }
+    },
+    "256K_4K": {
+      "no_SP": {
+        "prefill_time_ms": 871651.0042993695,
+        "sp": false,
+        "mhc_sp": false,
+        "category_breakdown": {
+          "Attention Proj": {
+            "time_s": 51.11243242634378,
+            "time_ms": 51112.43242634378,
+            "pct": 5.86,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Attention Compute": {
+            "time_s": 269.88552982328724,
+            "time_ms": 269885.5298232872,
+            "pct": 30.96,
+            "dominant_bottleneck": "CUBE"
+          },
+          "KV Compression": {
+            "time_s": 4.882715795677404,
+            "time_ms": 4882.7157956774045,
+            "pct": 0.56,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Lightning Index": {
+            "time_s": 137.95112857746798,
+            "time_ms": 137951.128577468,
+            "pct": 15.83,
+            "dominant_bottleneck": "CUBE"
+          },
+          "mHC": {
+            "time_s": 123.12029167615965,
+            "time_ms": 123120.29167615966,
+            "pct": 14.12,
+            "dominant_bottleneck": "MEM"
+          },
+          "MoE Gate": {
+            "time_s": 2.555621621317187,
+            "time_ms": 2555.621621317187,
+            "pct": 0.29,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Routed": {
+            "time_s": 27.43378982391706,
+            "time_ms": 27433.78982391706,
+            "pct": 3.15,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Shared": {
+            "time_s": 0.0,
+            "time_ms": 0.0,
+            "pct": 0.0,
+            "dominant_bottleneck": "N/A"
+          },
+          "Communication": {
+            "time_s": 250.01825848604472,
+            "time_ms": 250018.2584860447,
+            "pct": 28.68,
+            "dominant_bottleneck": "COMM"
+          },
+          "Norm": {
+            "time_s": 0.9341553868799989,
+            "time_ms": 934.1553868799989,
+            "pct": 0.11,
+            "dominant_bottleneck": "MEM"
+          },
+          "Embedding/LMHead": {
+            "time_s": 3.7570806822745944,
+            "time_ms": 3757.0806822745944,
+            "pct": 0.43,
+            "dominant_bottleneck": "CUBE"
+          }
+        }
+      },
+      "SP_only": {
+        "prefill_time_ms": 636641.1836514781,
+        "sp": true,
+        "mhc_sp": false,
+        "category_breakdown": {
+          "Attention Proj": {
+            "time_s": 51.11243242634378,
+            "time_ms": 51112.43242634378,
+            "pct": 8.03,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Attention Compute": {
+            "time_s": 269.88552982328724,
+            "time_ms": 269885.5298232872,
+            "pct": 42.39,
+            "dominant_bottleneck": "CUBE"
+          },
+          "KV Compression": {
+            "time_s": 4.882715795677404,
+            "time_ms": 4882.7157956774045,
+            "pct": 0.77,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Lightning Index": {
+            "time_s": 137.95112857746798,
+            "time_ms": 137951.128577468,
+            "pct": 21.67,
+            "dominant_bottleneck": "CUBE"
+          },
+          "mHC": {
+            "time_s": 123.12029167615965,
+            "time_ms": 123120.29167615966,
+            "pct": 19.34,
+            "dominant_bottleneck": "MEM"
+          },
+          "MoE Gate": {
+            "time_s": 2.555621621317187,
+            "time_ms": 2555.621621317187,
+            "pct": 0.4,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Routed": {
+            "time_s": 3.4292237279896325,
+            "time_ms": 3429.2237279896326,
+            "pct": 0.54,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Shared": {
+            "time_s": 0.0,
+            "time_ms": 0.0,
+            "pct": 0.0,
+            "dominant_bottleneck": "N/A"
+          },
+          "Communication": {
+            "time_s": 39.8303898975999,
+            "time_ms": 39830.3898975999,
+            "pct": 6.26,
+            "dominant_bottleneck": "COMM"
+          },
+          "Norm": {
+            "time_s": 0.11676942335999986,
+            "time_ms": 116.76942335999986,
+            "pct": 0.02,
+            "dominant_bottleneck": "MEM"
+          },
+          "Embedding/LMHead": {
+            "time_s": 3.7570806822745944,
+            "time_ms": 3757.0806822745944,
+            "pct": 0.59,
+            "dominant_bottleneck": "CUBE"
+          }
+        }
+      },
+      "SP_mHC_SP": {
+        "prefill_time_ms": 528910.9284348373,
+        "sp": true,
+        "mhc_sp": true,
+        "category_breakdown": {
+          "Attention Proj": {
+            "time_s": 51.11243242634378,
+            "time_ms": 51112.43242634378,
+            "pct": 9.66,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Attention Compute": {
+            "time_s": 269.88552982328724,
+            "time_ms": 269885.5298232872,
+            "pct": 51.03,
+            "dominant_bottleneck": "CUBE"
+          },
+          "KV Compression": {
+            "time_s": 4.882715795677404,
+            "time_ms": 4882.7157956774045,
+            "pct": 0.92,
+            "dominant_bottleneck": "CUBE"
+          },
+          "Lightning Index": {
+            "time_s": 137.95112857746798,
+            "time_ms": 137951.128577468,
+            "pct": 26.08,
+            "dominant_bottleneck": "CUBE"
+          },
+          "mHC": {
+            "time_s": 15.390036459519957,
+            "time_ms": 15390.036459519957,
+            "pct": 2.91,
+            "dominant_bottleneck": "MEM"
+          },
+          "MoE Gate": {
+            "time_s": 2.555621621317187,
+            "time_ms": 2555.621621317187,
+            "pct": 0.48,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Routed": {
+            "time_s": 3.4292237279896325,
+            "time_ms": 3429.2237279896326,
+            "pct": 0.65,
+            "dominant_bottleneck": "CUBE"
+          },
+          "MoE Shared": {
+            "time_s": 0.0,
+            "time_ms": 0.0,
+            "pct": 0.0,
+            "dominant_bottleneck": "N/A"
+          },
+          "Communication": {
+            "time_s": 39.8303898975999,
+            "time_ms": 39830.3898975999,
+            "pct": 7.53,
+            "dominant_bottleneck": "COMM"
+          },
+          "Norm": {
+            "time_s": 0.11676942335999986,
+            "time_ms": 116.76942335999986,
+            "pct": 0.02,
+            "dominant_bottleneck": "MEM"
+          },
+          "Embedding/LMHead": {
+            "time_s": 3.7570806822745944,
+            "time_ms": 3757.0806822745944,
+            "pct": 0.71,
+            "dominant_bottleneck": "CUBE"
+          }
+        }
+      }
+    }
+  }
+}
