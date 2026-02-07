@@ -50,6 +50,11 @@ perf_model/               # 核心包
   report.py               # 格式化、打印、CSV 导出、通信 vs 计算分析
 main.py                   # CLI 入口
 output/                   # 自动生成：带时间戳的运行结果，包含 CSV 和控制台输出
+param_search/             # 参数搜索工具
+  search.py               # 网格搜索 TP/EP/DP/BS/seq，覆盖 4 个场景
+  analyze.py              # 分析结果并生成 search_report.md
+  report.md               # 搜索结果详细分析报告
+  results/                # 自动生成：带时间戳的搜索结果 CSV
 ```
 
 ## 架构
@@ -73,13 +78,38 @@ output/                   # 自动生成：带时间戳的运行结果，包含 
 ### 添加新模型配置
 创建新的 `configs/model_xxx.json`。关键字段：`compress_ratios` 必须是长度为 `num_layers` 的列表，指定每层的压缩比（1 = 全注意力）。
 
-### 填充 KV 压缩占位符
-在 `perf_model/ops.py` 中，以下函数仍返回零开销，需用户根据实际压缩算法填充：
-- `op_kv_compression_decode()` — Decode 阶段的每步摊销开销
+## 参数搜索
 
-以下 Prefill 压缩算子已实现：
-- `op_kv_compression_prefill()` — K 和 V 缓存压缩（4 次投影 + 分组压缩，K/V 各一次）
-- `op_index_kv_compression()` — Lightning Index 的索引键压缩（4 次投影 + 分组压缩）
+通过网格搜索并行策略、批大小和序列长度，寻找最优部署配置。
+
+```bash
+python param_search/search.py     # 运行搜索（约 30 秒）
+python param_search/analyze.py    # 分析结果并生成报告
+```
+
+搜索独立评估 4 个场景：
+
+| 场景 | 优化目标 | 指标 |
+|:---|:---|:---|
+| Prefill 延迟 | 首 Token 时间 | `prefill_time_ms`（最小化） |
+| Decode 延迟 | 单步生成速度 | `decode_first_step_ms`（最小化） |
+| Prefill 吞吐 | 每 GPU 每秒处理 Token 数 | `B*S / prefill_s / GPUs`（最大化） |
+| Decode 吞吐 | 每 GPU 每秒生成 Token 数 | `B*output_len / decode_s / GPUs`（最大化） |
+
+**搜索空间：** TP ∈ {1,2,4,8,16,32,64}，EP ∈ {1,2,4,...,256}，DP ∈ {1,2,4,8}，BS ∈ {1,...,512}，seq ∈ {1K,...,32K}
+**GPU 公式：** `physical_gpus = TP * DP`，约束 `(TP*DP) % EP == 0`
+**约束条件：** GPU 数量 ∈ [8, 64]，HBM ≤ 64 GB
+
+**关键结果（昇腾 910C）：**
+
+| 场景 | 最优配置 | 关键指标 | GPU 数 |
+|:---|:---|---:|---:|
+| Prefill 延迟 | TP=8, EP=64, DP=8, BS=8 | 179.9 ms | 64 |
+| Decode 延迟 | TP=8, EP=64, DP=8, BS=8 | 14.6 ms/步 | 64 |
+| Prefill 吞吐 | TP=8, EP=16, DP=2, BS=512 | 411 tok/s/GPU | 16 |
+| Decode 吞吐 | TP=8, EP=16, DP=2, BS=512 | 207 tok/s/GPU | 16 |
+
+详细分析请参见 [`param_search/report.md`](param_search/report.md)，包含逐序列长度分析、SP 影响、批大小缩放和部署建议。
 
 ## 关键假设
 
