@@ -50,6 +50,11 @@ perf_model/               # Core package
   report.py               # Formatting, printing, CSV export, comm vs compute analysis
 main.py                   # CLI entry point
 output/                   # Auto-generated: timestamped runs with CSV + console output
+param_search/             # Parameter search tool
+  search.py               # Grid search across TP/EP/DP/BS/seq for 4 scenarios
+  analyze.py              # Analyze results and generate search_report.md
+  report.md               # Detailed analysis of search results
+  results/                # Auto-generated: timestamped search results with CSVs
 ```
 
 ## Architecture
@@ -73,13 +78,38 @@ Create a new `configs/device_xxx.json` with fields matching `HardwareConfig`:
 ### Adding new model configs
 Create a new `configs/model_xxx.json`. Key field: `compress_ratios` must be a list of length `num_layers` specifying the compression ratio per layer (1 = full attention).
 
-### Filling in KV compression placeholders
-In `perf_model/ops.py`, the following function still returns a zero profile and is meant to be filled in:
-- `op_kv_compression_decode()` — amortized per-step cost during decode
+## Parameter Search
 
-The prefill compression ops are already implemented:
-- `op_kv_compression_prefill()` — K and V cache compression (4 projections + group compression, x2 for K and V)
-- `op_index_kv_compression()` — index key compression for Lightning Index (4 projections + group compression)
+Find optimal deployment configurations by grid-searching across parallelism strategies, batch sizes, and sequence lengths.
+
+```bash
+python param_search/search.py     # Run search (~30s)
+python param_search/analyze.py    # Analyze results and generate report
+```
+
+The search evaluates 4 independent scenarios:
+
+| Scenario | Optimizes | Metric |
+|:---|:---|:---|
+| Prefill Latency | Time to first token | `prefill_time_ms` (minimize) |
+| Decode Latency | Per-step generation speed | `decode_first_step_ms` (minimize) |
+| Prefill Throughput | Prefill tokens per GPU per second | `B*S / prefill_s / GPUs` (maximize) |
+| Decode Throughput | Output tokens per GPU per second | `B*output_len / decode_s / GPUs` (maximize) |
+
+**Search grid:** TP ∈ {1,2,4,8,16,32,64}, EP ∈ {1,2,4,...,256}, DP ∈ {1,2,4,8}, BS ∈ {1,...,512}, seq ∈ {1K,...,32K}
+**GPU formula:** `physical_gpus = TP * DP`, constraint `(TP*DP) % EP == 0`
+**Constraints:** GPU count ∈ [8, 64], HBM ≤ 64 GB
+
+**Key results (Ascend 910C):**
+
+| Scenario | Best Config | Key Metric | GPUs |
+|:---|:---|---:|---:|
+| Prefill Latency | TP=8, EP=64, DP=8, BS=8 | 179.9 ms | 64 |
+| Decode Latency | TP=8, EP=64, DP=8, BS=8 | 14.6 ms/step | 64 |
+| Prefill Throughput | TP=8, EP=16, DP=2, BS=512 | 411 tok/s/GPU | 16 |
+| Decode Throughput | TP=8, EP=16, DP=2, BS=512 | 207 tok/s/GPU | 16 |
+
+See [`param_search/report.md`](param_search/report.md) for detailed analysis including per-sequence-length breakdowns, SP impact, batch scaling, and deployment recommendations.
 
 ## Key Assumptions
 

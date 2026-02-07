@@ -54,6 +54,11 @@ def main():
     EP = cfg.rt.ep
     total_gpus = TP * DP
 
+    # Validate EDP is a positive integer
+    if total_gpus % EP != 0:
+        print(f"ERROR: EP ({EP}) must divide TP*DP ({total_gpus}) so EDP is integer")
+        sys.exit(1)
+
     # Create output directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir = os.path.join("output", timestamp)

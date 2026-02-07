@@ -25,6 +25,11 @@ perf_model/               # Core package
   report.py               # Formatting, printing, CSV export, comm vs compute analysis
 main.py                   # CLI entry point (thin wrapper)
 output/                   # Auto-generated: timestamped runs with CSV + console output
+param_search/             # Parameter search tool
+  search.py               # Grid search across TP/EP/DP/BS/seq for 4 scenarios
+  analyze.py              # Analyze results and generate search_report.md
+  report.md               # Detailed analysis of search results
+  results/                # Auto-generated: timestamped search results with CSVs
 ```
 
 ## Architecture
@@ -63,6 +68,27 @@ All compression ops are now implemented with exact per-step costs:
 - `op_kv_compression_decode()` — K/V compression per decode step (cost varies by `S_total % ratio`)
 - `op_index_kv_compression_prefill()` — index key compression for Lightning Index (prefill)
 - `op_index_kv_compression_decode()` — index key compression per decode step (cost varies by `S_total % ratio`)
+
+## Parameter Search
+
+Grid search for optimal DeepSeek V4 deployment configurations across 4 independent scenarios.
+
+```bash
+python param_search/search.py     # Run search (~30s)
+python param_search/analyze.py    # Analyze results and generate report
+```
+
+**4 Scenarios:** prefill latency, decode latency, prefill throughput, decode throughput
+**GPU formula:** `physical_gpus = TP * DP`, constraint `(TP*DP) % EP == 0`
+**Search grid:** TP ∈ {1..64}, EP ∈ {1..256}, DP ∈ {1..8}, BS ∈ {1..512}, seq ∈ {1K..32K}
+
+Key results (Ascend 910C):
+- Best prefill latency: TP=8, EP=64, DP=8, BS=8 → 179.9ms (64 GPUs)
+- Best decode latency: TP=8, EP=64, DP=8, BS=8 → 14.6ms/step (64 GPUs)
+- Best prefill throughput: TP=8, EP=16, DP=2, BS=512 → 411 tps/gpu (16 GPUs)
+- Best decode throughput: TP=8, EP=16, DP=2, BS=512 → 207 tps/gpu (16 GPUs)
+
+See `param_search/report.md` for detailed analysis.
 
 ## Model Parameters
 
