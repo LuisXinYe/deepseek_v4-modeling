@@ -314,24 +314,42 @@ def decode_step(S_total: int, cfg: Config) -> PhaseProfile:
     return phase
 
 
-def decode_model(cfg: Config) -> PhaseProfile:
-    """Total decode phase: iterate over output_len steps with growing context.
-    Returns aggregate profile at S_total = seq_len (first decode step)."""
-    S_base = cfg.rt.seq_len
-    output_len = cfg.rt.output_len
+def _compression_period(cfg: Config) -> int:
+    """LCM of all unique compression ratios (decode step periodicity)."""
+    from math import gcd
+    ratios = set(cfg.model.compress_ratios)
+    result = 1
+    for r in ratios:
+        result = result * r // gcd(result, r)
+    return result
 
-    # Report detailed profile at first step (context = seq_len)
+
+def decode_model(cfg: Config) -> PhaseProfile:
+    """Total decode phase using periodic sampling + trapezoidal interpolation.
+
+    Per-step cost decomposes as: constant + linear(S) + periodic(S, period=P).
+    Sampling the first P and last P steps captures the full periodic pattern
+    at both ends; the trapezoidal rule is exact for the linear component.
+    Falls back to exact iteration when output_len <= 2*P.
+    """
+    S_base = cfg.rt.seq_len
+    N = cfg.rt.output_len
+    P = _compression_period(cfg)
+
+    # Detailed profile at first step (for reporting)
     first_step = decode_step(S_base, cfg)
 
-    # Compute total decode time across all steps
-    total_time = 0.0
-    for step in range(output_len):
-        S_total = S_base + step
-        step_profile = decode_step(S_total, cfg)
-        total_time += step_profile.total_time_s
+    if N <= 2 * P:
+        # Small output: iterate all steps exactly
+        total_time = sum(decode_step(S_base + i, cfg).total_time_s for i in range(N))
+    else:
+        # Sample first and last periods, interpolate
+        T_first = sum(decode_step(S_base + i, cfg).total_time_s for i in range(P))
+        T_last = sum(decode_step(S_base + N - P + i, cfg).total_time_s for i in range(P))
+        total_time = N * (T_first + T_last) / (2 * P)
 
     B = cfg.rt.batch_size // cfg.rt.dp
     first_step.total_time_s = total_time
     first_step.phase = "decode_total"
-    first_step.total_tokens = B * output_len
+    first_step.total_tokens = B * N
     return first_step

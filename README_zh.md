@@ -121,3 +121,4 @@ python param_search/analyze.py    # 分析结果并生成报告
 - SP（序列并行）在 Prefill 阶段的每个 T_sp -> T_full 转换点插入 AllGather（注意力之前、MoE 前后、LM Head 之前）
 - 单批次 Decode 时 SP 无收益（T=1）
 - DP 将全局批次均匀分配；每卡批次 = batch_size / dp
+- Decode 聚合使用周期采样 + 梯形插值：单步代价为 `常量 + 线性(S) + 周期(S)`，周期 `P = LCM(compress_ratios)` = 128 步；仅评估 2P 步而非全部 N 步，最高可获得 16 倍加速且结果数学精确

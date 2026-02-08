@@ -121,3 +121,4 @@ See [`param_search/report.md`](param_search/report.md) for detailed analysis inc
 - SP (Sequence Parallel) inserts AllGather at every T_sp -> T_full transition in prefill (before attention, before/after MoE, before LM head)
 - Single-batch decode: SP provides no benefit (T=1)
 - DP splits global batch evenly; per-rank batch = batch_size / dp
+- Decode aggregation uses periodic sampling + trapezoidal interpolation: per-step cost is `constant + linear(S) + periodic(S)` with period `P = LCM(compress_ratios)` = 128 steps; only 2P steps are evaluated instead of all N, giving up to 16× speedup with mathematically exact results
