@@ -94,6 +94,19 @@ Key results (Ascend 910C):
 
 See `param_search/report.md` for detailed analysis.
 
+## Decode Fast Mode
+
+`decode_model()` uses periodic sampling + trapezoidal interpolation instead of iterating every decode step:
+
+- Per-step cost decomposes as `t(S) = constant + linear(S) + periodic(S)`
+- Period `P = LCM(compress_ratios)` = 128 for DeepSeek V4
+- Samples only the first P and last P steps, then interpolates: `T_total = N × (T_first + T_last) / (2P)`
+- Falls back to exact iteration when `output_len ≤ 2P`
+- Mathematically exact when `output_len` is a multiple of P; error < 0.001% otherwise
+- 16× speedup for `output_len=4096`
+
+See `_compression_period()` and `decode_model()` in `perf_model/layers.py`.
+
 ## Model Parameters
 
 - 43 layers: 2 full-attn (ratio=1), 21 C4A, 20 C128A
