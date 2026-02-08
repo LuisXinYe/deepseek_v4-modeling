@@ -1,18 +1,18 @@
-# DeepSeek V4 Parameter Search Results
+# DeepSeek V4 参数搜索结果
 
-**Generated:** 20260208_083241
-**Total search time:** 64.2s
-**GPU formula:** `physical_gpus = TP * DP`, constraint `(TP*DP) % EP == 0`
-**prefill_latency configs:** 1736
-**decode_latency configs:** 1736
-**prefill_throughput configs:** 434
-**decode_throughput configs:** 434
+**生成时间：** 20260208_083241
+**总搜索时间：** 64.2s
+**GPU公式：** `physical_gpus = TP * DP`，约束 `(TP*DP) % EP == 0`
+**prefill_latency 配置数：** 1736
+**decode_latency 配置数：** 1736
+**prefill_throughput 配置数：** 434
+**decode_throughput 配置数：** 434
 
-## 1. Prefill Latency (minimize prefill_time_ms)
+## 1. 预填充延迟（最小化 prefill_time_ms）
 
-### Top-10 Configurations
+### 前10最优配置
 
-| Rank | TP | EP | DP | EDP | BS | SeqLen | SP | Overlap | GPUs | Prefill(ms) | HBM(GB) |
+| 排名 | TP | EP | DP | EDP | BS | 序列长度 | SP | 重叠 | GPU数 | 预填充(ms) | HBM(GB) |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 1 | 8 | 64 | 8 | 1 | 8 | 1024 | True | True | 64 | 60.4 | 14.0 |
 | 2 | 8 | 64 | 8 | 1 | 8 | 1024 | True | False | 64 | 62.1 | 14.0 |
@@ -25,9 +25,9 @@
 | 9 | 4 | 32 | 8 | 1 | 8 | 1024 | True | False | 32 | 69.1 | 23.9 |
 | 10 | 8 | 32 | 4 | 1 | 4 | 1024 | False | True | 32 | 69.3 | 22.6 |
 
-### Best Config per Sequence Length
+### 各序列长度最优配置
 
-| SeqLen | TP | EP | DP | EDP | BS | SP | GPUs | Prefill(ms) |
+| 序列长度 | TP | EP | DP | EDP | BS | SP | GPU数 | 预填充(ms) |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 1024 | 8 | 64 | 8 | 1 | 8 | True | 64 | 60.4 |
 | 2048 | 8 | 64 | 8 | 1 | 8 | True | 64 | 96.5 |
@@ -36,9 +36,9 @@
 | 16384 | 8 | 64 | 8 | 1 | 8 | True | 64 | 682.8 |
 | 32768 | 8 | 64 | 8 | 1 | 8 | True | 64 | 1535.2 |
 
-### Sequence Parallelism Impact on Prefill
+### 序列并行对预填充的影响
 
-| SeqLen | SP=True(ms) | SP=False(ms) | Speedup |
+| 序列长度 | SP=True(ms) | SP=False(ms) | 加速比 |
 | ---: | ---: | ---: | ---: |
 | 1024 | 60.4 | 63.4 | 1.05x |
 | 2048 | 96.5 | 111.6 | 1.16x |
@@ -47,11 +47,11 @@
 | 16384 | 682.8 | 880.1 | 1.29x |
 | 32768 | 1535.2 | 1944.9 | 1.27x |
 
-## 2. Decode Latency (minimize decode_first_step_ms)
+## 2. 解码延迟（最小化 decode_first_step_ms）
 
-### Top-10 Configurations
+### 前10最优配置
 
-| Rank | TP | EP | DP | EDP | BS | SeqLen | SP | Overlap | GPUs | 1st Step(ms) | HBM(GB) |
+| 排名 | TP | EP | DP | EDP | BS | 序列长度 | SP | 重叠 | GPU数 | 首步(ms) | HBM(GB) |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 1 | 8 | 64 | 8 | 1 | 8 | 1024 | True | True | 64 | 14.472 | 14.0 |
 | 2 | 8 | 64 | 8 | 1 | 8 | 1024 | False | True | 64 | 14.472 | 14.0 |
@@ -64,9 +64,9 @@
 | 9 | 8 | 64 | 8 | 1 | 32 | 1024 | True | True | 64 | 14.634 | 14.1 |
 | 10 | 8 | 64 | 8 | 1 | 32 | 1024 | False | True | 64 | 14.634 | 14.1 |
 
-### Best Config per Sequence Length
+### 各序列长度最优配置
 
-| SeqLen | TP | EP | DP | EDP | BS | SP | GPUs | 1st Step(ms) |
+| 序列长度 | TP | EP | DP | EDP | BS | SP | GPU数 | 首步(ms) |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 1024 | 8 | 64 | 8 | 1 | 8 | True | 64 | 14.472 |
 | 2048 | 8 | 64 | 8 | 1 | 8 | True | 64 | 14.483 |
@@ -75,9 +75,9 @@
 | 16384 | 8 | 64 | 8 | 1 | 8 | True | 64 | 17.532 |
 | 32768 | 8 | 64 | 8 | 1 | 8 | True | 64 | 17.600 |
 
-### Sequence Parallelism Impact on Decode
+### 序列并行对解码的影响
 
-| SeqLen | SP=True(ms) | SP=False(ms) | Speedup |
+| 序列长度 | SP=True(ms) | SP=False(ms) | 加速比 |
 | ---: | ---: | ---: | ---: |
 | 1024 | 14.472 | 14.472 | 1.00x |
 | 2048 | 14.483 | 14.483 | 1.00x |
@@ -86,11 +86,11 @@
 | 16384 | 17.532 | 17.532 | 1.00x |
 | 32768 | 17.600 | 17.600 | 1.00x |
 
-## 3. Prefill Throughput (maximize prefill_tps_per_gpu)
+## 3. 预填充吞吐量（最大化 prefill_tps_per_gpu）
 
-### Top-10 Configurations
+### 前10最优配置
 
-| Rank | TP | EP | DP | EDP | BS | SeqLen | GPUs | TPS/GPU | HBM(GB) |
+| 排名 | TP | EP | DP | EDP | BS | 序列长度 | GPU数 | TPS/GPU | HBM(GB) |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 1 | 8 | 16 | 2 | 1 | 512 | 1024 | 16 | 1774.80 | 46.7 |
 | 2 | 8 | 16 | 2 | 1 | 256 | 1024 | 16 | 1771.17 | 43.3 |
@@ -103,15 +103,15 @@
 | 9 | 8 | 16 | 2 | 1 | 32 | 2048 | 16 | 1724.69 | 40.6 |
 | 10 | 8 | 16 | 2 | 1 | 512 | 4096 | 16 | 1723.40 | 60.2 |
 
-### Best Config per GPU Count
+### 各GPU数量最优配置
 
-| GPUs | TP | EP | DP | EDP | BS | SeqLen | TPS/GPU |
+| GPU数 | TP | EP | DP | EDP | BS | 序列长度 | TPS/GPU |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 16 | 8 | 16 | 2 | 1 | 512 | 1024 | 1774.80 |
 | 32 | 8 | 32 | 4 | 1 | 512 | 1024 | 892.36 |
 | 64 | 8 | 64 | 8 | 1 | 512 | 1024 | 446.04 |
 
-### Batch Size Scaling (Best Config)
+### 批量大小扩展（最优配置）
 
 | BS | TPS/GPU | HBM(GB) |
 | ---: | ---: | ---: |
@@ -125,11 +125,11 @@
 | 256 | 1771.17 | 43.3 |
 | 512 | 1774.80 | 46.7 |
 
-## 4. Decode Throughput (maximize decode_tps_per_gpu)
+## 4. 解码吞吐量（最大化 decode_tps_per_gpu）
 
-### Top-10 Configurations
+### 前10最优配置
 
-| Rank | TP | EP | DP | EDP | BS | SeqLen | GPUs | TPS/GPU | Exact TPS/GPU | Err% | HBM(GB) |
+| 排名 | TP | EP | DP | EDP | BS | 序列长度 | GPU数 | TPS/GPU | 精确TPS/GPU | 误差% | HBM(GB) |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 1 | 8 | 16 | 2 | 1 | 512 | 1024 | 16 | 308.48 | 308.48 | 0.0 | 46.7 |
 | 2 | 8 | 16 | 2 | 1 | 512 | 2048 | 16 | 288.32 | 288.32 | 3.1 | 50.6 |
@@ -142,15 +142,15 @@
 | 9 | 4 | 16 | 4 | 1 | 512 | 8192 | 16 | 181.17 | 181.17 | 0.1 | 60.2 |
 | 10 | 8 | 16 | 2 | 1 | 256 | 4096 | 16 | 173.39 | 173.39 | 0.1 | 50.2 |
 
-### Best Config per GPU Count
+### 各GPU数量最优配置
 
-| GPUs | TP | EP | DP | EDP | BS | SeqLen | TPS/GPU |
+| GPU数 | TP | EP | DP | EDP | BS | 序列长度 | TPS/GPU |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 16 | 8 | 16 | 2 | 1 | 512 | 1024 | 308.48 |
 | 32 | 8 | 32 | 4 | 1 | 512 | 1024 | 131.29 |
 | 64 | 8 | 64 | 8 | 1 | 512 | 1024 | 49.54 |
 
-### Batch Size Scaling (Best Config)
+### 批量大小扩展（最优配置）
 
 | BS | TPS/GPU | HBM(GB) |
 | ---: | ---: | ---: |
@@ -164,6 +164,6 @@
 | 256 | 188.36 | 43.3 |
 | 512 | 308.48 | 46.7 |
 
-## Verification Summary
+## 验证摘要
 
-- **Decode throughput top-10:** 10 verified, max error = 3.50%, avg error = 0.87%
+- **解码吞吐量前10：** 10 个已验证，最大误差 = 3.50%，平均误差 = 0.87%

@@ -113,3 +113,17 @@ See `_compression_period()` and `decode_model()` in `perf_model/layers.py`.
 - MQA: 64 Q heads, 1 KV head
 - Lightning Index: 64 heads, dim=128, topK=512
 - MoE: 256 routed experts, top-6, 1 shared expert
+
+## Bilingual Reports
+
+Every `*.md` report, doc, and README must have a `*_zh.md` Chinese translation. Translations must have identical data/tables/numbers with translated prose and headings.
+
+Current file pairs:
+- `report/report_en.md` ↔ `report/report_zh.md`
+- `report/ppt_outline_en.md` ↔ `report/ppt_outline_zh.md`
+- `README.md` ↔ `README_zh.md`
+- `param_search/report.md` ↔ `param_search/report_zh.md`
+
+Exceptions (no Chinese mirror needed):
+- `CLAUDE.md` — internal instructions for Claude Code
+- `.claude/commands/*.md` — internal command definitions
