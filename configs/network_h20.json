@@ -1,0 +1,6 @@
+{
+    "tp_bandwidth_GBps": 450,
+    "ep_bandwidth_GBps": 50,
+    "latency_us": 5,
+    "bandwidth_utilization": 0.8
+}
