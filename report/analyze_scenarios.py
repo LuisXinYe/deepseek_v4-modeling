@@ -239,10 +239,10 @@ def compute_pd_ratio(p_tps_per_gpu, g_p, d_tps_per_gpu, g_d, input_len, output_l
 # ---------------------------------------------------------------------------
 
 OP_CATEGORIES = {
-    "Attention Proj": ["q_proj_dq", "q_proj_uq", "k_proj", "v_proj", "wo_a", "wo_b"],
-    "Attention Compute": ["attention_full", "attention_comp"],
+    "Attention Proj": ["q_proj_dq", "q_proj_uq", "kv_proj", "wo_a", "wo_b"],
+    "Attention Compute": ["attention_swa", "attention_comp"],
     "KV Compression": ["kv_compression", "kv_compression_decode"],
-    "Lightning Index": ["index_iq_proj", "index_ik_proj", "index_kv_compress",
+    "Lightning Index": ["index_iq_proj", "index_kv_compress",
                         "index_kv_compress_decode", "index_score", "index_score_ar"],
     "mHC": ["mhc_pre_attn", "sinkhorn_attn", "mhc_post_attn",
             "mhc_pre_moe", "sinkhorn_moe", "mhc_post_moe",

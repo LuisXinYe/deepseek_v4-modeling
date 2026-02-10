@@ -6,7 +6,7 @@ import os
 import sys
 from datetime import datetime
 
-from perf_model import Config, prefill_model, decode_step, decode_model
+from perf_model import Config, prefill_model, decode_step, decode_model, _compression_period
 from perf_model.report import (
     fmt_ms, print_config_summary, print_phase_report, print_memory_report,
     export_ops_csv, export_layer_summary_csv, export_memory_csv,
@@ -102,7 +102,10 @@ def main():
             print(f"    Throughput: {per_rank_tps:.1f} tokens/s (per rank)")
             print(f"    Throughput: {per_rank_tps * DP:.1f} tokens/s (total, x{DP} DP)")
         print()
+        P = _compression_period(cfg)
+        decode_method = "exact" if cfg.rt.output_len <= 2 * P else f"fast (period={P}, sampled {2*P}/{cfg.rt.output_len} steps)"
         print(f"  Decode ({cfg.rt.output_len} tokens):")
+        print(f"    Method:     {decode_method}")
         print(f"    Total time: {fmt_ms(decode_total.total_time_s)} ms")
         print(f"    First step: {fmt_ms(decode_first_step.total_time_s)} ms")
         if decode_total.total_time_s > 0:

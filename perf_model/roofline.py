@@ -73,7 +73,6 @@ def allreduce_time(vol_bytes: float, n: int, bw_gbps: float,
 def alltoall_time(vol_bytes: float, n: int, bw_gbps: float,
                   latency_us: float, bw_util: float) -> float:
     """AllToAll: (n-1)/n * vol / effective_bw + latency."""
-     # FIXME: the alltoall should consider load imbalance factor => more volume.
     if n <= 1:
         return 0.0
     factor = (n - 1) / n
@@ -113,3 +112,8 @@ def sum_ops(ops: List[OpProfile], name: str) -> OpProfile:
 def bytes2(count: int) -> float:
     """BF16 bytes for `count` elements."""
     return count * 2.0
+
+
+def bytes4(count: int) -> float:
+    """FP32 bytes for `count` elements."""
+    return count * 4.0

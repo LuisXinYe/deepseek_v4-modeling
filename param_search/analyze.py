@@ -440,6 +440,227 @@ def generate_markdown_report(results_dir, all_results, all_analyses, meta):
     return report_path
 
 
+def generate_markdown_report_zh(results_dir, all_results, all_analyses, meta):
+    """Generate a Chinese markdown report with 4 scenario sections."""
+    lines = []
+
+    lines.append("# DeepSeek V4 参数搜索结果\n")
+    lines.append(f"**生成时间：** {meta.get('timestamp', 'N/A')}")
+    lines.append(f"**总搜索时间：** {meta.get('total_time_s', 'N/A')}s")
+    lines.append(f"**GPU公式：** `physical_gpus = TP * DP`，约束 `(TP*DP) % EP == 0`")
+    valid = meta.get("valid_configs", {})
+    for key, count in valid.items():
+        lines.append(f"**{key} 配置数：** {count}")
+    lines.append("")
+
+    # --- Section 1: Prefill Latency ---
+    pf_lat = all_results.get("prefill_latency", [])
+    pf_lat_a = all_analyses.get("prefill_latency", {})
+    lines.append("## 1. 预填充延迟（最小化 prefill_time_ms）\n")
+
+    if pf_lat:
+        lines.append("### 前10最优配置\n")
+        headers = ["排名", "TP", "EP", "DP", "EDP", "BS", "序列长度", "SP", "重叠",
+                    "GPU数", "预填充(ms)", "HBM(GB)"]
+        rows = []
+        for i, r in enumerate(pf_lat[:10]):
+            rows.append([
+                i + 1, r["tp"], r["ep"], r["dp"], r["edp"],
+                r["batch_size"], r["seq_len"], r["sp"], r["shared_expert_overlapped"],
+                r["physical_gpus"], fmt_num(r["prefill_time_ms"]),
+                fmt_num(r["hbm_total_gb"]),
+            ])
+        lines.append(md_table(headers, rows))
+        lines.append("")
+
+    if pf_lat_a.get("best_per_seq"):
+        lines.append("### 各序列长度最优配置\n")
+        headers = ["序列长度", "TP", "EP", "DP", "EDP", "BS", "SP", "GPU数", "预填充(ms)"]
+        rows = []
+        for sl in sorted(pf_lat_a["best_per_seq"].keys()):
+            r = pf_lat_a["best_per_seq"][sl]
+            rows.append([
+                sl, r["tp"], r["ep"], r["dp"], r["edp"],
+                r["batch_size"], r["sp"], r["physical_gpus"],
+                fmt_num(r["prefill_time_ms"]),
+            ])
+        lines.append(md_table(headers, rows))
+        lines.append("")
+
+    if pf_lat_a.get("sp_impact"):
+        lines.append("### 序列并行对预填充的影响\n")
+        headers = ["序列长度", "SP=True(ms)", "SP=False(ms)", "加速比"]
+        rows = []
+        for sl in sorted(pf_lat_a["sp_impact"].keys()):
+            imp = pf_lat_a["sp_impact"][sl]
+            rows.append([
+                sl, fmt_num(imp["sp_true_ms"]),
+                fmt_num(imp["sp_false_ms"]),
+                f"{imp['speedup']:.2f}x",
+            ])
+        lines.append(md_table(headers, rows))
+        lines.append("")
+
+    # --- Section 2: Decode Latency ---
+    dc_lat = all_results.get("decode_latency", [])
+    dc_lat_a = all_analyses.get("decode_latency", {})
+    lines.append("## 2. 解码延迟（最小化 decode_first_step_ms）\n")
+
+    if dc_lat:
+        lines.append("### 前10最优配置\n")
+        headers = ["排名", "TP", "EP", "DP", "EDP", "BS", "序列长度", "SP", "重叠",
+                    "GPU数", "首步(ms)", "HBM(GB)"]
+        rows = []
+        for i, r in enumerate(dc_lat[:10]):
+            rows.append([
+                i + 1, r["tp"], r["ep"], r["dp"], r["edp"],
+                r["batch_size"], r["seq_len"], r["sp"], r["shared_expert_overlapped"],
+                r["physical_gpus"], fmt_num(r["decode_first_step_ms"], 3),
+                fmt_num(r["hbm_total_gb"]),
+            ])
+        lines.append(md_table(headers, rows))
+        lines.append("")
+
+    if dc_lat_a.get("best_per_seq"):
+        lines.append("### 各序列长度最优配置\n")
+        headers = ["序列长度", "TP", "EP", "DP", "EDP", "BS", "SP", "GPU数", "首步(ms)"]
+        rows = []
+        for sl in sorted(dc_lat_a["best_per_seq"].keys()):
+            r = dc_lat_a["best_per_seq"][sl]
+            rows.append([
+                sl, r["tp"], r["ep"], r["dp"], r["edp"],
+                r["batch_size"], r["sp"], r["physical_gpus"],
+                fmt_num(r["decode_first_step_ms"], 3),
+            ])
+        lines.append(md_table(headers, rows))
+        lines.append("")
+
+    if dc_lat_a.get("sp_impact"):
+        lines.append("### 序列并行对解码的影响\n")
+        headers = ["序列长度", "SP=True(ms)", "SP=False(ms)", "加速比"]
+        rows = []
+        for sl in sorted(dc_lat_a["sp_impact"].keys()):
+            imp = dc_lat_a["sp_impact"][sl]
+            rows.append([
+                sl, fmt_num(imp["sp_true_ms"], 3),
+                fmt_num(imp["sp_false_ms"], 3),
+                f"{imp['speedup']:.2f}x",
+            ])
+        lines.append(md_table(headers, rows))
+        lines.append("")
+
+    # --- Section 3: Prefill Throughput ---
+    pf_thr = all_results.get("prefill_throughput", [])
+    pf_thr_a = all_analyses.get("prefill_throughput", {})
+    lines.append("## 3. 预填充吞吐量（最大化 prefill_tps_per_gpu）\n")
+
+    if pf_thr:
+        lines.append("### 前10最优配置\n")
+        headers = ["排名", "TP", "EP", "DP", "EDP", "BS", "序列长度",
+                    "GPU数", "TPS/GPU", "HBM(GB)"]
+        rows = []
+        for i, r in enumerate(pf_thr[:10]):
+            rows.append([
+                i + 1, r["tp"], r["ep"], r["dp"], r["edp"],
+                r["batch_size"], r["seq_len"], r["physical_gpus"],
+                fmt_num(r["prefill_tps_per_gpu"], 2),
+                fmt_num(r["hbm_total_gb"]),
+            ])
+        lines.append(md_table(headers, rows))
+        lines.append("")
+
+    if pf_thr_a.get("best_per_gpu"):
+        lines.append("### 各GPU数量最优配置\n")
+        headers = ["GPU数", "TP", "EP", "DP", "EDP", "BS", "序列长度", "TPS/GPU"]
+        rows = []
+        for gpus in sorted(pf_thr_a["best_per_gpu"].keys()):
+            r = pf_thr_a["best_per_gpu"][gpus]
+            rows.append([
+                gpus, r["tp"], r["ep"], r["dp"], r["edp"],
+                r["batch_size"], r["seq_len"],
+                fmt_num(r["prefill_tps_per_gpu"], 2),
+            ])
+        lines.append(md_table(headers, rows))
+        lines.append("")
+
+    if pf_thr_a.get("batch_scaling"):
+        lines.append("### 批量大小扩展（最优配置）\n")
+        headers = ["BS", "TPS/GPU", "HBM(GB)"]
+        rows = []
+        for r in pf_thr_a["batch_scaling"]:
+            rows.append([
+                r["batch_size"],
+                fmt_num(r["prefill_tps_per_gpu"], 2),
+                fmt_num(r["hbm_total_gb"]),
+            ])
+        lines.append(md_table(headers, rows))
+        lines.append("")
+
+    # --- Section 4: Decode Throughput ---
+    dc_thr = all_results.get("decode_throughput", [])
+    dc_thr_a = all_analyses.get("decode_throughput", {})
+    lines.append("## 4. 解码吞吐量（最大化 decode_tps_per_gpu）\n")
+
+    if dc_thr:
+        lines.append("### 前10最优配置\n")
+        headers = ["排名", "TP", "EP", "DP", "EDP", "BS", "序列长度",
+                    "GPU数", "TPS/GPU", "精确TPS/GPU", "误差%", "HBM(GB)"]
+        rows = []
+        for i, r in enumerate(dc_thr[:10]):
+            exact_tps = r.get("decode_tps_per_gpu", "")
+            err = r.get("approx_error_pct", "")
+            rows.append([
+                i + 1, r["tp"], r["ep"], r["dp"], r["edp"],
+                r["batch_size"], r["seq_len"], r["physical_gpus"],
+                fmt_num(r["decode_tps_per_gpu"], 2) if isinstance(r.get("decode_tps_per_gpu"), (int, float)) else r.get("decode_tps_per_gpu", "-"),
+                fmt_num(r.get("decode_tps_per_gpu"), 2) if r.get("approx_error_pct", "") != "" else "-",
+                fmt_num(err) if err != "" else "-",
+                fmt_num(r["hbm_total_gb"]),
+            ])
+        lines.append(md_table(headers, rows))
+        lines.append("")
+
+    if dc_thr_a.get("best_per_gpu"):
+        lines.append("### 各GPU数量最优配置\n")
+        headers = ["GPU数", "TP", "EP", "DP", "EDP", "BS", "序列长度", "TPS/GPU"]
+        rows = []
+        for gpus in sorted(dc_thr_a["best_per_gpu"].keys()):
+            r = dc_thr_a["best_per_gpu"][gpus]
+            rows.append([
+                gpus, r["tp"], r["ep"], r["dp"], r["edp"],
+                r["batch_size"], r["seq_len"],
+                fmt_num(r["decode_tps_per_gpu"], 2),
+            ])
+        lines.append(md_table(headers, rows))
+        lines.append("")
+
+    if dc_thr_a.get("batch_scaling"):
+        lines.append("### 批量大小扩展（最优配置）\n")
+        headers = ["BS", "TPS/GPU", "HBM(GB)"]
+        rows = []
+        for r in dc_thr_a["batch_scaling"]:
+            rows.append([
+                r["batch_size"],
+                fmt_num(r["decode_tps_per_gpu"], 2),
+                fmt_num(r["hbm_total_gb"]),
+            ])
+        lines.append(md_table(headers, rows))
+        lines.append("")
+
+    # --- Verification summary ---
+    if dc_thr_a.get("verification"):
+        v = dc_thr_a["verification"]
+        lines.append("## 验证摘要\n")
+        lines.append(f"- **解码吞吐量前10：** {v['count']} 个已验证，"
+                      f"最大误差 = {v['max_error']:.2f}%，平均误差 = {v['avg_error']:.2f}%")
+        lines.append("")
+
+    report_path = os.path.join(results_dir, "search_report_zh.md")
+    with open(report_path, "w") as f:
+        f.write("\n".join(lines))
+    return report_path
+
+
 def main():
     results_dir = find_latest_results()
     print(f"Loading results from: {results_dir}")
@@ -528,11 +749,16 @@ def main():
 
         print()
 
-    # --- Generate report ---
+    # --- Generate reports ---
     report_path = generate_markdown_report(
         results_dir, all_results, all_analyses, meta,
     )
     print(f"Report saved to: {report_path}")
+
+    report_zh_path = generate_markdown_report_zh(
+        results_dir, all_results, all_analyses, meta,
+    )
+    print(f"Chinese report saved to: {report_zh_path}")
 
 
 if __name__ == "__main__":

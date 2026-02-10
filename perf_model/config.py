@@ -30,7 +30,8 @@ class ModelConfig:
     vocab_size: int = 129280
     num_attention_heads: int = 64
     head_dim: int = 512
-    rope_head_dim: int = 64
+    rope_head_dim: int = 64     # TODO: the rope_head_dim is already contained in Dqc, do not double count
+
     q_lora_rank: int = 1024
     o_groups: int = 8
     o_lora_rank: int = 1024
@@ -51,23 +52,27 @@ class ModelConfig:
         return 1  # MQA
 
     @property
-    def k_dim(self) -> int:
-        # FIXME: now use head dim directly, the rope is contained inside the head dim
-        # return self.head_dim + self.rope_head_dim  # 512 + 64 = 576
+    def kv_dim(self) -> int:
+        """Shared K=V dimension (uncompressed). Used for full-attn and SWA cache."""
         return self.head_dim  # 512
 
     @property
-    def v_dim(self) -> int:
+    def compress_c_kv(self) -> int:
+        """Shared compressed K=V dimension. Same as kv_dim today, may differ in future."""
         return self.head_dim  # 512
 
-    @property
-    def compress_c_k(self) -> int:
-        # return self.head_dim + self.rope_head_dim  # = k_dim = 576
-        return self.head_dim  # = k_dim = 512
-
-    @property
-    def compress_c_v(self) -> int:
-        return self.head_dim  # = v_dim = 512
+    def compress_coeff(self, ratio: int) -> float:
+        """Layer-type coefficient for compression cost.
+        C4A  (ratio=4):   1.0 — full compression pipeline
+        C128A (ratio=128): 0.5 — simpler compression
+        Full  (ratio=1):   0.0 — no compression
+        """
+        if ratio == 1:
+            return 0.0
+        elif ratio == 4:
+            return 1.0
+        else:
+            return 0.5
 
     @property
     def o_mid_dim(self) -> int:

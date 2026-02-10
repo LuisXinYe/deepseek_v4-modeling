@@ -80,6 +80,10 @@ All compression ops are now implemented with exact per-step costs:
 - `op_index_kv_compression_prefill()` — index key compression for Lightning Index (prefill)
 - `op_index_kv_compression_decode()` — index key compression per decode step (cost varies by `S_total % ratio`)
 
+## Future Work (TODO)
+- Overlap optimization: SWA and compressed attention currently modeled as separate ops.
+  Future analysis could model shared Q reads and overlapped execution.
+
 ## Parameter Search
 
 Grid search for optimal DeepSeek V4 deployment configurations across 4 independent scenarios.
@@ -102,9 +106,36 @@ Key results (Ascend 910C, 8K/4K):
 4 serving combos analyzed: 8K/4K, 32K/4K, 128K/4K, 256K/4K.
 See `report/report_en.md` for detailed analysis and `param_search/report.md` for search details.
 
+## Decode Fast Mode
+
+`decode_model()` uses periodic sampling + trapezoidal interpolation instead of iterating every decode step:
+
+- Per-step cost decomposes as `t(S) = constant + linear(S) + periodic(S)`
+- Period `P = LCM(compress_ratios)` = 128 for DeepSeek V4
+- Samples only the first P and last P steps, then interpolates: `T_total = N × (T_first + T_last) / (2P)`
+- Falls back to exact iteration when `output_len ≤ 2P`
+- Mathematically exact when `output_len` is a multiple of P; error < 0.001% otherwise
+- 16× speedup for `output_len=4096`
+
+See `_compression_period()` and `decode_model()` in `perf_model/layers.py`.
+
 ## Model Parameters
 
-- 43 layers: 2 full-attn (ratio=1), 21 C4A, 20 C128A
+- 43 layers: 2 SWA (ratio=1), 21 C4A, 20 C128A
 - MQA: 64 Q heads, 1 KV head
 - Lightning Index: 64 heads, dim=128, topK=512
 - MoE: 256 routed experts, top-6, 1 shared expert
+
+## Bilingual Reports
+
+Every `*.md` report, doc, and README must have a `*_zh.md` Chinese translation. Translations must have identical data/tables/numbers with translated prose and headings.
+
+Current file pairs:
+- `report/report_en.md` ↔ `report/report_zh.md`
+- `report/ppt_outline_en.md` ↔ `report/ppt_outline_zh.md`
+- `README.md` ↔ `README_zh.md`
+- `param_search/report.md` ↔ `param_search/report_zh.md`
+
+Exceptions (no Chinese mirror needed):
+- `CLAUDE.md` — internal instructions for Claude Code
+- `.claude/commands/*.md` — internal command definitions

@@ -3,7 +3,7 @@
 from typing import List
 
 from .config import Config
-from .roofline import OpProfile, roofline_time, allreduce_time, alltoall_time, allgather_time, bytes2
+from .roofline import OpProfile, roofline_time, allreduce_time, alltoall_time, allgather_time, bytes2, bytes4
 
 
 # --- Attention Projections ---
@@ -34,32 +34,20 @@ def op_q_proj_uq(T: int, cfg: Config) -> OpProfile:
     return roofline_time("q_proj_uq", flops, 0, weight_bytes + act_in + act_out, cfg.hw)
 
 
-def op_k_proj(T: int, cfg: Config) -> OpProfile:
-    """W_k: [H, k_dim], replicated (MQA, 1 KV head)."""
+def op_kv_proj(T: int, cfg: Config) -> OpProfile:
+    """W_kv: [H, kv_dim], replicated (MQA, K=V shared)."""
     H = cfg.model.hidden_size
-    kd = cfg.model.k_dim
-    flops = T * H * kd * 2
-    weight_bytes = bytes2(H * kd)
+    kv_d = cfg.model.kv_dim
+    flops = T * H * kv_d * 2
+    weight_bytes = bytes2(H * kv_d)
     act_in = bytes2(T * H)
-    act_out = bytes2(T * kd)
-    return roofline_time("k_proj", flops, 0, weight_bytes + act_in + act_out, cfg.hw)
-
-
-def op_v_proj(T: int, cfg: Config) -> OpProfile:
-    """W_v: [H, v_dim], replicated (MQA, 1 KV head)."""
-    H = cfg.model.hidden_size
-    vd = cfg.model.v_dim
-    flops = T * H * vd * 2
-    weight_bytes = bytes2(H * vd)
-    act_in = bytes2(T * H)
-    act_out = bytes2(T * vd)
-    return roofline_time("v_proj", flops, 0, weight_bytes + act_in + act_out, cfg.hw)
+    act_out = bytes2(T * kv_d)
+    return roofline_time("kv_proj", flops, 0, weight_bytes + act_in + act_out, cfg.hw)
 
 
 def op_wo_a(T: int, cfg: Config) -> OpProfile:
     """wo_a: block-diag, Ng/TP blocks of [Nq/Ng * Dqc, o_lora_rank].
     Total FLOPs = T * Nq/TP * Dqc * o_lora_rank * 2."""
-    # TODO: review this part later by human
     Nq = cfg.model.num_attention_heads
     Dqc = cfg.model.head_dim
     olr = cfg.model.o_lora_rank
@@ -76,7 +64,6 @@ def op_wo_a(T: int, cfg: Config) -> OpProfile:
 
 def op_wo_b(T: int, cfg: Config) -> OpProfile:
     """wo_b: [o_mid_dim/TP, H], RowParallel."""
-    # TODO: review this part later by human
     H = cfg.model.hidden_size
     omd = cfg.model.o_mid_dim
     TP = cfg.rt.tp
@@ -114,51 +101,41 @@ def op_index_iq_proj(T: int, cfg: Config) -> OpProfile:
     act_out = bytes2(T * out_dim)
     return roofline_time("index_iq_proj", flops, 0, weight_bytes + act_in + act_out, cfg.hw)
 
-
-def op_index_ik_proj(T: int, cfg: Config) -> OpProfile:
-    """W_ik: replicated [H, index_head_dim] (1 head)."""
-    H = cfg.model.hidden_size
-    hd = cfg.model.index_head_dim
-    flops = T * H * hd * 2
-    weight_bytes = bytes2(H * hd)
-    act_in = bytes2(T * H)
-    act_out = bytes2(T * hd)
-    return roofline_time("index_ik_proj", flops, 0, weight_bytes + act_in + act_out, cfg.hw)
-
-
 def op_index_kv_compression_prefill(B: int, S: int, ratio: int, cfg: Config) -> OpProfile:
     """Index key compression for Lightning Index.
-    4 projections [d', d'] + group compression (g tokens -> 1).
-    Cube: 8*B*S*d'^2 + (8g-2)*B*d'*(S/g)
-    Vec:  (4g+1)*d'*B*(S/g)
-    Mem:  5*B*S*d' elements
+    Projection [H, d'] + group compression (g tokens -> 1),.
+    Memory = input(B*S*H) + weight(H*d') + output(B*S_comp*d').
     """
+    H = cfg.model.hidden_size
     d = cfg.model.index_head_dim   # d_c' = 128
-    g = ratio                       # group size = compression ratio
+    g = ratio
     S_comp = S // g
 
-    cube_flops = 8 * B * S * d**2 + (8 * g - 2) * B * d * S_comp
+    cube_flops = (8 * B * S * H * d + (8 * g - 2) * B * d * S_comp)
     vec_ops = (4 * g + 1) * d * B * S_comp
-    mem_bytes = bytes2(5 * B * S * d)
+    mem_bytes = bytes2(int((B * S * H + 4 * H * d + B * S_comp * d))) # assume we don't need to explicitly store Ca, Cb, Za, Zb
 
     return roofline_time("index_kv_compress", cube_flops, vec_ops, mem_bytes, cfg.hw)
 
 def op_index_kv_compression_decode(B: int, S_total: int, ratio: int, cfg: Config) -> OpProfile:
     """Index key compression for decode: exact per-step cost.
-    When S_total % ratio == 0: projections + group compression.
-    Otherwise: projections only (no group compression).
+    When S_total % ratio == 0: projection + group compression.
+    Otherwise: projection only (no group compression).
+    Memory = input(B*H) + weight(H*d') + output(B*d') + compressor input (2 * g * 2 * B * d').
     """
+    H = cfg.model.hidden_size
     d = cfg.model.index_head_dim   # d_c' = 128
     g = ratio
 
     if S_total % g == 0:
-        cube_flops = 8 * B * d**2 + (8 * g - 2) * B * d
+        cube_flops = (8 * B * H * d + (8 * g - 2) * B * d)
         vec_ops    = (4 * g + 1) * B * d
-        mem_elems  = 10 * B * d + 4 * d**2
+        mem_elems += int((B * H + 4 * H * d) + (4 * g * B * d) + B * d) # read 2 vector from this group, 2 vector from next group
     else:
-        cube_flops = 8 * B * d**2
+        cube_flops = 8 * B * H * d
         vec_ops    = 0
-        mem_elems  = 5 * B * d + 4 * d**2
+        mem_elems = int((B * H + 4 * H * d + 4 * B * d))
+
 
     return roofline_time("index_kv_compress_decode", cube_flops, vec_ops, bytes2(mem_elems), cfg.hw)
 
@@ -173,15 +150,15 @@ def op_index_score(B: int, S: int, ratio: int, cfg: Config) -> OpProfile:
     flops = B * nh * S * S_compressed * hd * 2
     # Act memory: iq[B, nh, S, hd] + ik[B, 1, S_compressed, hd] + scores[B, S, S_compressed]
     act_in = bytes2(B * nh * S * hd) + bytes2(B * S_compressed * hd)
-    act_out = B * S * S_compressed * 4  # FP32 scores
+    act_out = bytes4(B * S * S_compressed)  # FP32 scores
     return roofline_time("index_score", flops, 0, act_in + act_out, cfg.hw)
 
 
 def op_index_score_allreduce(B: int, S: int, ratio: int, cfg: Config) -> OpProfile:
-    """AllReduce partial scores across TP: B*S*(S//ratio)*4 bytes (FP32)."""
+    """AllReduce partial scores across TP: B*S*(S//ratio) elements in BF16."""
     TP = cfg.rt.tp
     S_compressed = S // ratio
-    vol = B * S * S_compressed * 4  # FP32
+    vol = bytes2(B * S * S_compressed)
     t = allreduce_time(vol, TP, cfg.net.tp_bandwidth_gbps,
                        cfg.net.latency_us, cfg.net.bandwidth_utilization)
     return OpProfile(name="index_score_ar", comm_bytes=vol, comm_time_s=t,
@@ -198,201 +175,163 @@ def op_index_score_decode(B: int, S_total: int, ratio: int, cfg: Config) -> OpPr
     flops = B * nh * S_compressed * hd * 2
     # Memory: read all index K cache + query
     act_in = bytes2(B * S_compressed * hd) + bytes2(B * nh * hd)
-    act_out = B * S_compressed * 4  # FP32 scores
+    act_out = bytes4(B * S_compressed)  # FP32 scores
     return roofline_time("index_score", flops, 0, act_in + act_out, cfg.hw)
 
 
 def op_index_score_allreduce_decode(B: int, S_total: int, ratio: int, cfg: Config) -> OpProfile:
-    """Decode: AllReduce scores, B*1*(S_total//ratio)*4 bytes."""
+    """Decode: AllReduce scores, B*(S_total//ratio) elements in BF16."""
     TP = cfg.rt.tp
     S_compressed = S_total // ratio
-    vol = B * S_compressed * 4
+    vol = bytes2(B * S_compressed)
     t = allreduce_time(vol, TP, cfg.net.tp_bandwidth_gbps,
                        cfg.net.latency_us, cfg.net.bandwidth_utilization)
     return OpProfile(name="index_score_ar", comm_bytes=vol, comm_time_s=t,
                      time_s=t, bottleneck="COMM" if t > 0 else "")
 
 
-# --- KV Compression Placeholder ---
-
+# --- KV Compression ---
 def op_kv_compression_prefill(B: int, S: int, ratio: int, cfg: Config) -> OpProfile:
-    """KV compression for prefill: compress both K and V caches.
-    Per K/V: 4 projections [d, d] + group compression (g tokens -> 1).
-    Cube: 2*[8*B*S*d^2 + (8g-2)*B*d*(S/g)]  (x2 for K and V)
-    Vec:  2*(4g+1)*d*B*(S/g)                  (x2 for K and V)
-    Mem:  2*5*B*S*d elements                   (x2 for K and V)
+    """KV compression for prefill: K=V shared, projection [H, c_kv] + group compression.
+    Scaled by compress_coeff for layer type.
+    Memory = input(B*S*H) + weight(H*c_kv) + output(B*S_comp*c_kv).
+    
+    NOTICE: Here the formula calcuates C4A compression, for C128A, everything is halved.
     """
-    d = cfg.model.head_dim   # d_c = 512
-    g = ratio                 # group size = compression ratio
+    H = cfg.model.hidden_size
+    c_kv = cfg.model.compress_c_kv
+    g = ratio
     S_comp = S // g
+    coeff = cfg.model.compress_coeff(ratio)
 
-    cube_flops = 2 * (8 * B * S * d**2 + (8 * g - 2) * B * d * S_comp)
-    vec_ops = 2 * (4 * g + 1) * d * B * S_comp
-    mem_bytes = bytes2(2 * 5 * B * S * d)
+    cube_flops = coeff * (8 * B * S * H * c_kv + (8 * g - 2) * B * c_kv * S_comp)
+    vec_ops = coeff * (4 * g + 1) * c_kv * B * S_comp
+    mem_bytes = bytes2(int((B * S * H) + coeff * (4 * H * c_kv) + B * S_comp * c_kv))
+    
 
     return roofline_time("kv_compression", cube_flops, vec_ops, mem_bytes, cfg.hw)
 
-
 def op_kv_compression_decode(B: int, S_total: int, ratio: int, cfg: Config) -> OpProfile:
-    """KV compression for decode: exact per-step cost for both K and V.
-    When S_total % ratio == 0: projections + group compression.
-    Otherwise: projections only (no group compression).
+    """KV compression for decode: K=V shared, projection [H, c_kv] + group compression.
+    When S_total % ratio == 0: projection + group compression.
+    Otherwise: projection only (no group compression).
+    Memory = input(B*H) + weight(4*g*H*c_kv) + output(B*c_kv).
+    
+    NOTICE: Here the formula calcuates C4A compression, for C128A, everything is halved.
     """
-    d = cfg.model.head_dim   # d_c = 512
+    H = cfg.model.hidden_size
+    c_kv = cfg.model.compress_c_kv
     g = ratio
-
+    coeff = cfg.model.compress_coeff(ratio)
+        
     if S_total % g == 0:
-        cube_flops = 2 * (8 * B * d**2 + (8 * g - 2) * B * d)
-        vec_ops    = 2 * (4 * g + 1) * B * d
-        mem_elems  = 2 * (10 * B * d + 4 * d**2)
+        cube_flops = coeff * (8 * B * H * c_kv + (8 * g - 2) * B * c_kv)
+        vec_ops    = coeff * (4 * g + 1) * B * c_kv
+        mem_elems += int(B * H + coeff * (4 * H * c_kv + 4 * g * B * c_kv) + B * c_kv) # read 2 vector from this group, 2 vector from next group
     else:
-        cube_flops = 2 * 8 * B * d**2
+        cube_flops = coeff * 8 * B * H * c_kv
         vec_ops    = 0
-        mem_elems  = 2 * (5 * B * d + 4 * d**2)
+        mem_elems = coeff * int((B * H + coeff * (4 * H * c_kv + 4 * B * c_kv)))
 
     return roofline_time("kv_compression_decode", cube_flops, vec_ops, bytes2(mem_elems), cfg.hw)
 
 
 # --- Attention Score Computation ---
 
-def op_attention_prefill_full(B: int, S: int, cfg: Config) -> OpProfile:
-    """Prefill attention for ratio=1 layers (full MQA, flash attention memory model).
-    QK^T + softmax + Score*V."""
+def op_attention_prefill_swa(B: int, S: int, cfg: Config) -> OpProfile:
+    """SWA attention for prefill (all layers). Each query attends to W tokens.
+    K=V shared: one cache read."""
     TP = cfg.rt.tp
     Nq = cfg.model.num_attention_heads // TP
-    kd = cfg.model.k_dim
-    vd = cfg.model.v_dim
+    kv_d = cfg.model.kv_dim
     Dqc = cfg.model.head_dim
     Dr = cfg.model.rope_head_dim
+    W = cfg.model.window_size
 
-    # QK^T: B * Nq * S * S * k_dim * 2
-    flops_qk = B * Nq * S * S * kd * 2
-    # Score*V: B * Nq * S * S * v_dim * 2
-    flops_sv = B * Nq * S * S * vd * 2
+    flops_qk = B * Nq * S * W * kv_d * 2
+    flops_sv = B * Nq * S * W * kv_d * 2
     total_flops = flops_qk + flops_sv
+    vec_ops = B * Nq * S * W * 4
 
-    # Softmax: vec ops = B * Nq * S * S * 4 (exp, sum, div, sub)
-    vec_ops = B * Nq * S * S * 4
-
-    # Flash attention memory: Q + K + V read, O write (no intermediate to HBM)
-    q_bytes = bytes2(B * Nq * S * (Dqc + Dr))
-    k_bytes = bytes2(B * 1 * S * kd)
-    v_bytes = bytes2(B * 1 * S * vd)
+    q_bytes = bytes2(B * Nq * S * Dqc)
+    kv_bytes = bytes2(B * S * kv_d) # in prefill, we need read the whole KV matrix
     o_bytes = bytes2(B * Nq * S * Dqc)
-    mem = q_bytes + k_bytes + v_bytes + o_bytes
+    mem = q_bytes + kv_bytes + o_bytes
 
-    return roofline_time("attention_full", total_flops, vec_ops, mem, cfg.hw)
+    return roofline_time("attention_swa", total_flops, vec_ops, mem, cfg.hw)
 
 
 def op_attention_prefill_compressed(B: int, S: int, ratio: int, cfg: Config,
                                     use_index: bool = True) -> OpProfile:
-    """Prefill attention for ratio>1 layers: compressed + SWA.
-    If use_index=True (C4A), attends to topK selected entries.
-    If use_index=False (C128A), attends to all S//ratio compressed entries."""
+    """Prefill attention for compressed part only (no SWA, handled separately).
+    K=V shared. If use_index=True (C4A), attends to topK. Else all S//ratio."""
     TP = cfg.rt.tp
     Nq = cfg.model.num_attention_heads // TP
-    c_k = cfg.model.compress_c_k
-    c_v = cfg.model.compress_c_v
-    kd = cfg.model.k_dim
-    vd = cfg.model.v_dim
+    c_kv = cfg.model.compress_c_kv
     Dqc = cfg.model.head_dim
     Dr = cfg.model.rope_head_dim
-    W = cfg.model.window_size
     S_comp = S // ratio
-
-    # Number of compressed KV entries attended to per query
     n_attend = cfg.model.index_topk if use_index else S_comp
 
-    # Compressed attention
-    flops_comp_qk = B * Nq * S * n_attend * c_k * 2
-    flops_comp_sv = B * Nq * S * n_attend * c_v * 2
-    vec_comp = B * Nq * S * n_attend * 4
+    flops_comp_qk = B * Nq * S * n_attend * c_kv * 2
+    flops_comp_sv = B * Nq * S * n_attend * c_kv * 2
+    total_flops = flops_comp_qk + flops_comp_sv
+    vec_ops = B * Nq * S * n_attend * 4
 
-    # SWA attention
-    flops_swa_qk = B * Nq * S * W * kd * 2
-    flops_swa_sv = B * Nq * S * W * vd * 2
-    vec_swa = B * Nq * S * W * 4
-
-    total_flops = flops_comp_qk + flops_comp_sv + flops_swa_qk + flops_swa_sv
-    total_vec = vec_comp + vec_swa
-
-    # Flash attention memory model
-    q_bytes = bytes2(B * Nq * S * (Dqc + Dr))
+    q_bytes = bytes2(B * Nq * S * Dqc)
+    comp_kv_read = bytes2(B * S_comp * c_kv)
     o_bytes = bytes2(B * Nq * S * Dqc)
-    # Read full compressed KV cache (S//ratio entries) + SWA window (prefill read full, decode read n_attend entries)
-    comp_kv_read = bytes2(B * S_comp * c_k) + bytes2(B * S_comp * c_v)
-    swa_kv_read = bytes2(B * W * kd) + bytes2(B * W * vd)
-    mem = q_bytes + comp_kv_read + swa_kv_read + o_bytes
+    mem = q_bytes + comp_kv_read + o_bytes
 
-    return roofline_time("attention_comp", total_flops, total_vec, mem, cfg.hw)
+    return roofline_time("attention_comp", total_flops, vec_ops, mem, cfg.hw)
 
 
-def op_attention_decode_full(B: int, S_total: int, cfg: Config) -> OpProfile:
-    """Decode attention for ratio=1 layers. S_query=1, S_kv=S_total."""
+def op_attention_decode_swa(B: int, S_total: int, cfg: Config) -> OpProfile:
+    """SWA attention for decode (all layers). 1 query against min(W, S_total) tokens.
+    K=V shared: one cache read."""
     TP = cfg.rt.tp
     Nq = cfg.model.num_attention_heads // TP
-    kd = cfg.model.k_dim
-    vd = cfg.model.v_dim
+    kv_d = cfg.model.kv_dim
     Dqc = cfg.model.head_dim
     Dr = cfg.model.rope_head_dim
+    W = min(cfg.model.window_size, S_total)
 
-    flops_qk = B * Nq * 1 * S_total * kd * 2
-    flops_sv = B * Nq * 1 * S_total * vd * 2
+    flops_qk = B * Nq * 1 * W * kv_d * 2
+    flops_sv = B * Nq * 1 * W * kv_d * 2
     total_flops = flops_qk + flops_sv
+    vec_ops = B * Nq * W * 4
 
-    vec_ops = B * Nq * S_total * 4  # softmax
-
-    # Memory: KV cache read dominates
-    q_bytes = bytes2(B * Nq * 1 * (Dqc + Dr))
-    kv_cache_bytes = bytes2(B * S_total * kd) + bytes2(B * S_total * vd)
+    q_bytes = bytes2(B * Nq * 1 * Dqc)
+    kv_cache_bytes = bytes2(B * W * kv_d)
     o_bytes = bytes2(B * Nq * 1 * Dqc)
     mem = q_bytes + kv_cache_bytes + o_bytes
 
-    return roofline_time("attention_full", total_flops, vec_ops, mem, cfg.hw)
+    return roofline_time("attention_swa", total_flops, vec_ops, mem, cfg.hw)
 
 
 def op_attention_decode_compressed(B: int, S_total: int, ratio: int, cfg: Config,
                                    use_index: bool = True) -> OpProfile:
-    """Decode attention for ratio>1 layers: compressed + SWA.
-    If use_index=True (C4A), attends to topK selected entries.
-    If use_index=False (C128A), attends to all S_total//ratio compressed entries."""
+    """Decode attention for compressed part only (no SWA, handled separately).
+    K=V shared. If use_index=True (C4A), attends to topK. Else all S_total//ratio."""
     TP = cfg.rt.tp
     Nq = cfg.model.num_attention_heads // TP
-    c_k = cfg.model.compress_c_k
-    c_v = cfg.model.compress_c_v
-    kd = cfg.model.k_dim
-    vd = cfg.model.v_dim
+    c_kv = cfg.model.compress_c_kv
     Dqc = cfg.model.head_dim
     Dr = cfg.model.rope_head_dim
-    W = cfg.model.window_size
     S_comp = S_total // ratio
-
-    # Number of compressed KV entries attended to
     n_attend = cfg.model.index_topk if use_index else S_comp
 
-    # Compressed attention: 1 query against n_attend entries
-    flops_comp_qk = B * Nq * 1 * n_attend * c_k * 2
-    flops_comp_sv = B * Nq * 1 * n_attend * c_v * 2
-    vec_comp = B * Nq * n_attend * 4
+    flops_comp_qk = B * Nq * 1 * n_attend * c_kv * 2
+    flops_comp_sv = B * Nq * 1 * n_attend * c_kv * 2
+    total_flops = flops_comp_qk + flops_comp_sv
+    vec_ops = B * Nq * n_attend * 4
 
-    # SWA: 1 query against window
-    flops_swa_qk = B * Nq * 1 * W * kd * 2
-    flops_swa_sv = B * Nq * 1 * W * vd * 2
-    vec_swa = B * Nq * W * 4
-
-    total_flops = flops_comp_qk + flops_comp_sv + flops_swa_qk + flops_swa_sv
-    total_vec = vec_comp + vec_swa
-
-    # Memory reads:
-    q_bytes = bytes2(B * Nq * 1 * (Dqc + Dr))
-    # Compressed KV (selected topK or all S_comp entries)
-    comp_kv = bytes2(B * n_attend * c_k) + bytes2(B * n_attend * c_v)
-    # SWA window
-    swa_kv = bytes2(B * W * kd) + bytes2(B * W * vd)
+    q_bytes = bytes2(B * Nq * 1 * Dqc)
+    comp_kv = bytes2(B * n_attend * c_kv)
     o_bytes = bytes2(B * Nq * 1 * Dqc)
-    mem = q_bytes + comp_kv + swa_kv + o_bytes
+    mem = q_bytes + comp_kv + o_bytes
 
-    return roofline_time("attention_comp", total_flops, total_vec, mem, cfg.hw)
+    return roofline_time("attention_comp", total_flops, vec_ops, mem, cfg.hw)
 
 
 # --- mHC (Hyper Connection) ---
@@ -410,8 +349,8 @@ def op_mhc_pre(T: int, cfg: Config, label: str = "mhc_pre") -> OpProfile:
     D = cfg.model.hidden_size
     cube_flops = 2 * T * (n**2 + 2*n) * n * D + 5 * T * n + 2 * T * n**2
     vec_ops = 2 * T * n
-    # FP32 memory (×4): input/output activations + intermediate
-    mem_bytes = 4 * (3 * T * n * D + T * (n**2 + 2*n) * n * D + T * (n**2 + 2*n))
+    # FP32 memory: input/output activations + intermediate
+    mem_bytes = bytes4(3 * T * n * D + T * (n**2 + 2*n) * n * D + T * (n**2 + 2*n))
     return roofline_time(label, cube_flops, vec_ops, mem_bytes, cfg.hw)
 
 
@@ -426,8 +365,8 @@ def op_mhc_sinkhorn(T: int, cfg: Config, label: str = "sinkhorn") -> OpProfile:
     n = cfg.model.hc_mult
     cube_flops = 0
     vec_ops = T * n**2 + 40 * T * n * (2*n - 1)
-    # FP32 memory:
-    mem_bytes = 4 * (2 * T * n**2 + 20 * (2 * T * n**2 + 2 * T * n**2))
+    # FP32 memory
+    mem_bytes = bytes4(2 * T * n**2 + 20 * (2 * T * n**2 + 2 * T * n**2))
     return roofline_time(label, cube_flops, vec_ops, mem_bytes, cfg.hw)
 
 
@@ -440,7 +379,7 @@ def op_mhc_post(T: int, cfg: Config, label: str = "mhc_post") -> OpProfile:
     cube_flops = 2 * T * n**2 * D + 3 * T * n * D
     vec_ops = 0
     # FP32 memory
-    mem_bytes = 4 * (T * n + T * D + 6 * T * n * D + T * n**2)
+    mem_bytes = bytes4(T * n + T * D + 6 * T * n * D + T * n**2)
     return roofline_time(label, cube_flops, vec_ops, mem_bytes, cfg.hw)
 
 
@@ -546,7 +485,7 @@ def op_mhc_pre_fused(T: int, cfg: Config, label: str = "mhc_pre") -> OpProfile:
         bpe * T * n * D           # read x_l [T, n, D]
         + bpe * T * n * D         # write residual [T, n, D]
         + bpe * T * D             # write sub_input [T, D]
-        + 4 * (n * n + n)         # read weights (FP32, negligible)
+        + bytes4(n * n + n)       # read weights (FP32, negligible)
     )
     return roofline_time(label, cube_flops, vec_ops, mem_bytes, cfg.hw)
 
@@ -595,7 +534,7 @@ def op_mhc_post_fused(T: int, cfg: Config, label: str = "mhc_post") -> OpProfile
         bpe * T * n * D           # read residual [T, n, D]
         + bpe * T * D             # read sub_output [T, D]
         + bpe * T * n * D         # write x_{l+1} [T, n, D]
-        + 4 * n                   # read H_post logits (FP32, negligible)
+        + bytes4(n)               # read H_post logits (FP32, negligible)
     )
     return roofline_time(label, cube_flops, vec_ops, mem_bytes, cfg.hw)
 
@@ -666,7 +605,7 @@ def op_mhc_post_pre_fused(T: int, cfg: Config, label: str = "mhc_post_pre") -> O
         + bpe * T * D             # read sub_output_k [T, D]
         + bpe * T * n * D         # write residual_{k+1} [T, n, D]
         + bpe * T * D             # write sub_input_{k+1} [T, D]
-        + 4 * (n * n + 2 * n)    # read all weights (FP32, negligible)
+        + bytes4(n * n + 2 * n)  # read all weights (FP32, negligible)
     )
     return roofline_time(label, cube_flops, vec_ops, mem_bytes, cfg.hw)
 
