@@ -8,7 +8,7 @@ This report presents a roofline-based performance analysis of DeepSeek V4 infere
 
 1. **KV compression is V4's defining advantage.** The heterogeneous compression schedule (2 full + 21 C4A + 20 C128A layers) reduces KV cache to 0.062 GB per batch element at 8K -- 9.3x smaller than V3's MLA and up to 12.7x smaller than uncompressed at 128K. This enables 10x larger batch sizes within the same HBM budget.
 
-2. **mHC kernel fusion is mandatory for practical deployment.** Without fusion, mHC consumes 84.6% of prefill time. Fused BF16 kernels with Sequence Parallelism reduce this to 3.5%, delivering a 6.25x end-to-end prefill speedup.
+2. **mHC kernel fusion is mandatory; SP offers further gains.** Without fusion, mHC consumes 84.6% of prefill time at 8K. Kernel fusion alone reduces this to 36.5% (4.11x end-to-end speedup). Adding BF16 precision and mHC Sequence Parallelism further reduces mHC to 3.5%, delivering a 6.25x total prefill speedup.
 
 3. **The 910C and H20 have complementary strengths.** The 910C achieves 1.68--1.78x faster prefill latency (compute advantage), while the H20 delivers 2.13--2.14x faster decode (memory bandwidth advantage). For decode throughput, the 910C leads at 8K (1.14x) thanks to its 7.84x EP bandwidth advantage, but the H20 dominates at 32K+ (up to 2.77x at 256K).
 
@@ -16,7 +16,7 @@ This report presents a roofline-based performance analysis of DeepSeek V4 infere
 
 5. **Lightning Index emerges as the dominant cost at long context.** Rising from 4.4% of prefill time at 8K to 44.4% at 256K on the 910C, Lightning Index overtakes mHC as the primary bottleneck -- the next frontier for optimization.
 
-6. **EP network bandwidth determines MoE serving economics.** The 910C's 392 GB/s EP bandwidth (7.84x the H20's 50 GB/s) transforms the MoE communication profile: communication is 57.3% of H20 decode time versus 21.6% on the 910C, making datacenter network design a first-order concern for MoE deployment.
+6. **EP network bandwidth determines MoE serving economics.** The 910C's 392 GB/s EP bandwidth (7.84x the H20's 50 GB/s) fundamentally reshapes the decode bottleneck: communication consumes 57.3% of H20 decode time versus 21.6% on the 910C, as the H20's narrow EP link bottlenecks MoE dispatch/combine across 16 ranks each step. The 910C's fast interconnect makes MoE communication cheap, shifting the bottleneck to weight reads instead (46.6% vs 18.4%). This is the single most important factor explaining why the 910C achieves competitive decode throughput at short context despite 2.22x lower HBM bandwidth.
 
 ---
 

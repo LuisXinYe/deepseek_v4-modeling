@@ -181,7 +181,7 @@ After Agent D completes, run a **translation agent**:
 1. Read the verified `report/report_en.md`
 2. Read the existing `report/report_zh.md` to understand the translation style
 3. Translate `report/report_en.md` → `report/report_zh.md`:
-   - Translate all prose and headings to Chinese
+   - Traranslate all prose and headings to Chinese, be native, fluent, and professional
    - Keep all data tables, numbers, code blocks, and formulas **identical**
    - Keep technical terms in English where standard (e.g., "MoE", "KV cache", "roofline")
 4. Similarly update:
