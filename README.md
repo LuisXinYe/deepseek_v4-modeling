@@ -124,6 +124,8 @@ See [`param_search/report.md`](param_search/report.md) for detailed search analy
 
 - BF16 (2 bytes) for all weights and activations
 - Flash attention memory model (no intermediate materialization to HBM)
+- `head_dim` (512) already contains `rope_head_dim` (64) — RoPE is embedded within the head dimension, not a separate projection. Q byte calculations use `Dqc` only.
+- Prefill attention reads full KV cache (`B * S * kv_d`) rather than per-query window reads — since every Q position needs its local window, a single sequential read is more efficient. Decode reads only the window (SWA) or top-K entries (compressed).
 - MoE load balance factor = 1.0 for hash-routing layers, configurable for others
 - Shared expert can fully overlap with routed expert computation (configurable)
 - Communication modeled as additive (not overlapped with compute)

@@ -62,6 +62,12 @@ Pipeline: **config** -> **roofline** -> **ops** -> **layers** -> **memory/report
 - `mhc_fused_bf16` (default: False): Use BF16 precision in fused mHC ops (requires mhc_kernel_fused=True)
 - `shared_expert_overlapped` (default: True): Shared expert overlaps with MoE dispatch/combine communication
 
+## Attention Memory Model
+
+- **`head_dim` (512) already contains `rope_head_dim` (64)**: RoPE is embedded within the head dimension, not a separate additive projection. Q byte calculations use `Dqc` only (not `Dqc + Dr`).
+- **Prefill KV reads**: In prefill, attention ops read the full KV cache (`B * S * kv_d`) rather than just the local window. Since every Q position needs its own local window, a single sequential read of the entire KV is more efficient than per-Q random window reads. This applies to both SWA and compressed attention prefill.
+- **Decode KV reads**: In decode (single query), SWA reads only the window (`B * W * kv_d`); compressed attention reads the compressed cache or top-K entries.
+
 ## Output
 
 Each run produces `output/<timestamp>/` containing:

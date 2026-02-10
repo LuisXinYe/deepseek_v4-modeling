@@ -124,6 +124,8 @@ python param_search/analyze.py    # 分析结果并生成报告
 
 - 所有权重和激活使用 BF16（2 字节）
 - Flash Attention 显存模型（中间结果不写回 HBM）
+- `head_dim`（512）已包含 `rope_head_dim`（64）— RoPE 嵌入在头维度内，不需要单独投影。Q 字节计算仅使用 `Dqc`。
+- Prefill 注意力读取完整 KV 缓存（`B * S * kv_d`），而非逐 Query 窗口读取 — 由于每个 Q 位置都需要其局部窗口，单次顺序读取比逐 Q 随机窗口读取更高效。Decode 仅读取窗口（SWA）或 top-K 条目（压缩注意力）。
 - 哈希路由层的 MoE 负载均衡因子 = 1.0，其他层可配置
 - 共享专家可与路由专家完全重叠计算（可配置，默认开启）
 - mHC 内核融合默认开启：融合后 mHC 前/后投影的中间结果保留在寄存器/SRAM 中，不写回 HBM

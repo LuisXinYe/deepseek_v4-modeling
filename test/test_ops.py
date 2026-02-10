@@ -123,7 +123,7 @@ class TestLightningIndex(unittest.TestCase):
         coeff = cfg.model.compress_coeff(ratio)  # 1.0
         expected_cube = coeff * (8 * B * S * H * d + (8 * g - 2) * B * d * S_comp)
         expected_vec = coeff * (4 * g + 1) * d * B * S_comp
-        expected_mem = bytes2(int(coeff * (B * S * H + H * d + B * S_comp * d)))
+        expected_mem = bytes2(int((B * S * H + 4 * H * d + B * S_comp * d)))
         self.assertEqual(op.flops, expected_cube)
         self.assertEqual(op.vec_ops, expected_vec)
         self.assertEqual(op.mem_bytes, expected_mem)
@@ -203,7 +203,7 @@ class TestKVCompression(unittest.TestCase):
         coeff = cfg.model.compress_coeff(ratio)  # 1.0
         expected_cube = coeff * (8 * B * S * H * c_kv + (8 * g - 2) * B * c_kv * S_comp)
         expected_vec = coeff * (4 * g + 1) * c_kv * B * S_comp
-        expected_mem = bytes2(int(coeff * (B * S * H + H * c_kv + B * S_comp * c_kv)))
+        expected_mem = bytes2(int((B * S * H) + coeff * (4 * H * c_kv) + B * S_comp * c_kv))
         self.assertEqual(kv_op.flops, expected_cube)
         self.assertEqual(kv_op.vec_ops, expected_vec)
         self.assertEqual(kv_op.mem_bytes, expected_mem)
@@ -250,18 +250,17 @@ class TestAttentionCompute(unittest.TestCase):
         self.assertEqual(op.flops, flops_qk + flops_sv)
 
     def test_prefill_swa_flash_attn_mem(self):
-        """Flash attention memory model: Q + KV_window (shared) read, O write."""
+        """Flash attention memory: Q + full KV read + O write.
+        head_dim includes rope_head_dim. Prefill reads full KV (not just window)."""
         cfg = make_config()
         B, S = 2, 128
         op = ops.op_attention_prefill_swa(B, S, cfg)
         TP = cfg.rt.tp
         Nq = cfg.model.num_attention_heads // TP
         Dqc = cfg.model.head_dim
-        Dr = cfg.model.rope_head_dim
         kv_d = cfg.model.kv_dim
-        W = cfg.model.window_size
-        q_bytes = bytes2(B * Nq * S * (Dqc + Dr))
-        kv_bytes = bytes2(B * W * kv_d)
+        q_bytes = bytes2(B * Nq * S * Dqc)
+        kv_bytes = bytes2(B * S * kv_d)  # full KV read in prefill
         o_bytes = bytes2(B * Nq * S * Dqc)
         expected_mem = q_bytes + kv_bytes + o_bytes
         self.assertEqual(op.mem_bytes, expected_mem)
