@@ -5,37 +5,51 @@
 ## 幻灯片 1：封面页
 
 - **标题**：DeepSeek V4 推理性能分析：昇腾 910C vs NVIDIA H20
-- 基于 Roofline 模型的性能建模，覆盖三种服务场景
+- 基于 Roofline 模型的性能建模，覆盖四种服务场景
 - 硬件平台：昇腾 910C、NVIDIA H20
-- 服务场景：8K/4K、128K/4K、256K/4K（输入/输出 token 长度）
+- 服务场景：8K/4K、32K/4K、128K/4K、256K/4K（输入/输出 token 长度）
+- 内容结构：架构、瓶颈、优化、模块深度分析、部署建议
 - **可视化建议**：标题文字配合平台 Logo 及场景图标
 
 ---
 
-## 幻灯片 2：核心发现总结
+## 幻灯片 2：摘要 — 核心发现
 
-- mHC 内核融合（默认开启）将 Prefill 时间缩短 3--4 倍；融合基线下 mHC 仅占 25%--36%（未融合时 84%）
-- Decode 阶段受 MoE 权重加载限制：路由专家权重加载占 910C Decode 的 40--56%
-- 融合基线下 H20 Prefill 吞吐仅高 1.1--1.5 倍（原始差距 1.5--2.6 倍被大幅缩小）
-- P/D 分离比例：910C 上 1P:1D (8K)、2P:1D (128K)、3P:1D (256K)
-- mHC-SP 在融合基线上再带来 1.5--2 倍 Prefill 加速；910C EP 带宽优势（7.8 倍）支撑高 EP MoE 配置
-- 融合后瓶颈迁移至注意力投影（CUBE 受限）—— 910C 的 2.54 倍算力优势发挥空间更大
+- mHC 内核融合（默认开启）将 Prefill 缩短 3--4 倍；910C 8K 下 mHC 从 84% 降至 36%
+- 910C Prefill 吞吐接近持平 — 融合后 8K 差距从 2.57 倍缩小至 1.12 倍
+- Decode 在 910C 上受 MoE 权重加载限制（40--56%），在 H20 短上下文下受通信限制（54%）
+- V4 的 KV 压缩相比 V3 节省 4.6 倍内存 — 使长上下文实际可服务
+- P/D 分离比例：910C 上 1P:1D (8K)、1P:1D (32K)、2P:1D (128K)、3P:1D (256K)
+- 910C EP 带宽优势（7.84 倍）支持高 EP MoE 配置，H20 上代价过高
 - **可视化建议**：编号高亮卡片或图标网格，总结六项核心发现
 
 ---
 
 ## 幻灯片 3：DeepSeek V4 架构概览
 
-- 43 层 Transformer：2 层全注意力、21 层 C4A（4 倍压缩）、20 层 C128A（128 倍压缩）
-- MQA：64 个 Q 头、1 个 KV 头、head_dim=512，Q LoRA 秩 = 1,024
+- 43 层 Transformer：2 层全注意力（ratio=1）、21 层 C4A（4 倍压缩）、20 层 C128A（128 倍压缩）
+- MQA：64 个 Q 头、1 个 KV 头、head_dim=512，Q LoRA rank=1,024
 - MoE：256 个路由专家（top-6 路由）、1 个共享专家、inter_dim=2,048
 - mHC（超级连接）：每个子层均有 FP32 前/后投影 + Sinkhorn 归一化
 - Lightning Index：64 个索引头、dim=128、topK=512，用于压缩 KV 条目选择
-- **可视化建议**：架构框图，展示层类型、MoE 路由和 mHC 数据流
+- KV 压缩：分组投影对 K 和 V 缓存按比例压缩（C4A=4 倍、C128A=128 倍）
+- **可视化建议**：架构框图，展示层类型、MoE 路由、mHC 数据流和 KV 压缩机制
 
 ---
 
-## 幻灯片 4：硬件对比 — 昇腾 910C vs NVIDIA H20
+## 幻灯片 4：V4 vs V3 对比
+
+- 总参数量：V4 ~286B vs V3 ~704B（V4 小 2.5 倍）
+- Hidden size：V4 = 4,096 vs V3 = 7,168；层数：V4 = 43 vs V3 = 61
+- KV 方案：V4 = MQA + KV 压缩（C4A/C128A） vs V3 = MLA（kv_lora_rank=512）
+- 每 token KV 缓存：V4 = 15,168 bytes vs V3 = 70,272 bytes — **节省 4.6 倍**
+- V4 新增 mHC（超级连接）和 Lightning Index；V3 均无
+- V4 以较小 hidden dim 换取激进压缩 — 使 128K+ 上下文在合理 batch 下可行
+- **可视化建议**：并排对比表，用箭头高亮关键架构差异
+
+---
+
+## 幻灯片 5：硬件平台 — 910C vs H20
 
 - Cube 算力（BF16）：910C = 376 TFLOPS，H20 = 148 TFLOPS（910C 2.54 倍优势）
 - HBM 带宽：910C = 1,800 GB/s，H20 = 4,000 GB/s（H20 2.22 倍优势）
@@ -46,177 +60,167 @@
 
 ---
 
-## 幻灯片 5：方法论 — Roofline 性能模型
+## 幻灯片 6：各类别瓶颈总结
 
-- 每个算子由三个资源维度刻画：Cube 时间、Vec 时间、Mem 时间
-- 瓶颈 = argmax(cube, vec, mem)；总时间 = max(cube, vec, mem) + 通信时间
-- 浮点运算约定：矩阵乘法 [M,K] x [K,N] = M x N x K x 2；BF16 = 2 字节，FP32 = 4 字节
-- 利用率假设：计算 50%，HBM 带宽 80%（两个平台一致）
-- 搜索空间：TP 属于 {1..64}，EP 属于 {1..256}，DP 属于 {1..8}，BS 属于 {1..512}；约束：(TP x DP) % EP == 0
-- **可视化建议**：Roofline 图，展示算力 vs 访存强度，标注示例算子位置
-
----
-
-## 幻灯片 6：参数搜索结果 — 8K/4K（双平台）
-
-- 910C Prefill 吞吐：1,656 tps/gpu（TP=8, EP=16, DP=2, BS=256, 16 GPUs）
-- H20 Prefill 吞吐：1,848 tps/gpu（TP=8, EP=8, DP=1, BS=128, 8 GPUs）— 高 1.12 倍
-- 910C Decode 吞吐：181 tps/gpu（TP=4, EP=16, DP=4, BS=512, 16 GPUs）
-- H20 Decode 吞吐：252 tps/gpu（TP=8, EP=16, DP=2, BS=512, 16 GPUs）— 高 1.39 倍
-- 910C Prefill 延迟：330ms（64 GPUs）vs H20：554ms（64 GPUs）— 910C 快 1.68 倍
-- **可视化建议**：分组柱状图，对比 910C 与 H20 的 Prefill 和 Decode 吞吐/延迟
+- Prefill 为计算受限（CUBE）：注意力投影、MoE 专家矩阵乘法均受 CUBE 限制
+- Decode 为访存受限（MEM/COMM）：MoE 权重加载和 KV 缓存读取主导
+- mHC：两阶段均为 MEM 受限（融合内核大幅降低绝对时间）
+- Lightning Index：COMM 受限（score AllReduce 跨 TP rank）
+- 通信：MoE 的 AllToAll dispatch/combine，注意力的 AllReduce，SP 的 AllGather
+- **可视化建议**：表格，按类别标注瓶颈类型（CUBE / VEC / MEM / COMM），分 Prefill 和 Decode 颜色编码
 
 ---
 
-## 幻灯片 7：参数搜索结果 — 128K/4K（双平台）
+## 幻灯片 7：Prefill 算子分解 — 910C（融合基线）
 
-- 910C Prefill 吞吐：760 tps/gpu（16 GPUs）；H20：798 tps/gpu（8 GPUs）— H20 高 1.05 倍
-- 910C Decode 吞吐：16.7 tps/gpu（32 GPUs）；H20：47.4 tps/gpu（16 GPUs）— H20 高 2.84 倍
-- 128K 下每 rank 最大 batch 降至个位数，受 KV 缓存内存限制
-- 910C Prefill 延迟：10.7s（64 GPUs）；H20：20.4s（64 GPUs）— 910C 快 1.9 倍
-- 910C Decode 延迟：21.0 ms/step；H20：9.9 ms/step — H20 快 2.1 倍
-- **可视化建议**：分组柱状图，910C vs H20 各项指标；标注内存约束信息
-
----
-
-## 幻灯片 8：参数搜索结果 — 256K/4K（双平台）
-
-- 910C Prefill 吞吐：482 tps/gpu（16 GPUs）；H20：497 tps/gpu（8 GPUs）— H20 高 1.03 倍
-- 910C Decode 吞吐：8.5 tps/gpu（32 GPUs）；H20：25.6 tps/gpu（32 GPUs）— H20 高 3.01 倍
-- 910C Prefill 延迟：33.9s（64 GPUs）；H20：65.7s（64 GPUs）— 910C 快 1.94 倍（二次注意力下 Cube 算力优势显现）
-- 最大 batch 再次减半：910C 上 BS=8，H20（EP=8）上 BS=4
-- 256K 服务在两个平台上都代价高昂，需考虑分块策略
-- **可视化建议**：分组柱状图；标注框高亮内存受限的 batch 规模
+- 8K：mHC = 36.3%，Attn Proj = 25.4%，通信 = 18.1%，Attn Compute = 7.8%，Lightning Index = 4.8%
+- 32K：mHC = 29.4%，Attn Proj = 20.6%，Attn Compute = 16.2%，通信 = 14.6%，Lightning Index = 13.1%
+- 128K：Attn Compute = 31.6%，Lightning Index = 28.2%，mHC = 16.7%，Attn Proj = 11.7%
+- 256K：Attn Compute = 39.0%，Lightning Index = 35.5%，mHC = 10.6%，Attn Proj = 7.4%
+- 趋势：短上下文 mHC 主导；注意力计算二次增长，128K+ 下成为主要瓶颈
+- **可视化建议**：堆叠柱状图，展示 8K/32K/128K/256K 各类别占比
 
 ---
 
-## 幻灯片 9：长上下文扩展趋势
+## 幻灯片 8：Decode 算子分解 — 910C（融合基线）
 
-- Prefill 延迟：910C 上 0.33s -> 10.7s -> 33.9s（8K -> 128K -> 256K）
-- Decode 吞吐急剧下降：910C 上 181 -> 16.7 -> 8.5 tps/gpu（8K -> 128K -> 256K）
-- Decode 延迟相对稳定：19.3 -> 21.0 -> 21.6 ms/step（压缩机制有效控制注意力开销）
-- 融合基线下 910C Prefill 延迟全面优于 H20（mHC 融合 + Cube 算力双重优势）
-- H20 在长序列 Decode 优势扩大（更多 KV 缓存读取受益于 2.2 倍 HBM 带宽）
+- 8K：MoE Routed = 55.9%，Attn Compute = 14.5%，通信 = 12.9%，Lightning Index = 5.7%
+- 32K：MoE Routed = 38.1%，Attn Compute = 25.2%，通信 = 14.4%，Lightning Index = 11.3%
+- 128K：MoE Routed = 40.3%，Attn Compute = 22.0%，Lightning Index = 16.4%，通信 = 12.4%
+- 256K：MoE Routed = 41.1%，Attn Compute = 21.4%，Lightning Index = 16.7%，通信 = 12.2%
+- Decode 由 MoE 权重加载主导（38--56%）；长序列下注意力/索引 KV 缓存读取占比增长
+- **可视化建议**：堆叠柱状图，展示 8K/32K/128K/256K 各 Decode 类别占比
+
+---
+
+## 幻灯片 9：910C vs H20 瓶颈对比
+
+- Prefill 8K：910C 由 mHC 主导（36.3%） vs H20 由 Attn Proj（36.0%）和通信（26.6%）主导
+- 根因：910C 较低 HBM 带宽使 MEM 受限的 mHC 更慢；H20 较低 Cube 算力使瓶颈转向 CUBE 算子
+- Decode 8K：910C 由 MoE Routed 主导（55.9%） vs H20 由通信主导（54.2%）
+- 根因：910C 较低 HBM 带宽使权重加载占主导；H20 的 50 GB/s EP 使 AllToAll 占主导
+- 128K+ 下两个平台均收敛为 MoE 权重加载受限
+- **可视化建议**：配对饼图或堆叠柱状图，对比 910C vs H20 Prefill 和 Decode 的瓶颈分布
+
+---
+
+## 幻灯片 10：最优配置 — 8K/4K 和 32K/4K
+
+- 910C 8K：Prefill 1,656 tps/gpu (TP=8,EP=16,DP=2,BS=256)，Decode 181 tps/gpu (TP=4,EP=16,DP=4,BS=512)
+- H20 8K：Prefill 1,848 tps/gpu (TP=8,EP=8,DP=1,BS=128)，Decode 252 tps/gpu (TP=8,EP=16,DP=2,BS=512)
+- 910C 32K：Prefill 1,340 tps/gpu (TP=8,EP=16,DP=2,BS=64)，Decode 62.2 tps/gpu (TP=4,EP=32,DP=8,BS=512)
+- H20 32K：Prefill 1,463 tps/gpu (TP=8,EP=8,DP=1,BS=32)，Decode 137 tps/gpu (TP=4,EP=16,DP=4,BS=256)
+- Prefill 吞吐差距：H20 仅高 1.12 倍（8K）、1.09 倍（32K）— 融合后接近持平
+- **可视化建议**：分组柱状图，对比 910C vs H20 8K 和 32K 的 Prefill 和 Decode 吞吐
+
+---
+
+## 幻灯片 11：最优配置 — 128K/4K 和 256K/4K
+
+- 910C 128K：Prefill 760 tps/gpu（16 GPUs），Decode 16.7 tps/gpu（32 GPUs）；H20：798 / 47.4 tps/gpu
+- 910C 256K：Prefill 482 tps/gpu（16 GPUs），Decode 8.5 tps/gpu（32 GPUs）；H20：497 / 25.6 tps/gpu
+- 128K+ 下每 rank 最大 batch 降至个位数，受 KV 缓存内存限制
+- H20 Decode 优势扩大：128K 高 2.84 倍，256K 高 3.01 倍（HBM 带宽主导 Decode）
+- Prefill 吞吐接近持平：H20 仅高 1.05 倍（128K）、1.03 倍（256K）— 长上下文下 Cube 算力主导
+- **可视化建议**：分组柱状图，910C vs H20 128K/256K 各项指标；标注内存约束信息
+
+---
+
+## 幻灯片 12：延迟随场景扩展趋势
+
+- Prefill 延迟：910C 上 330ms -> 1,535ms -> 10,747ms -> 33,923ms（8K -> 32K -> 128K -> 256K）
+- 910C 全场景 Prefill 延迟低于 H20 1.68--1.94 倍（Cube 算力优势）
+- Decode 延迟极为稳定：910C 上 19.3 -> 19.4 -> 21.0 -> 21.6 ms/step（KV 压缩有效控制开销）
+- H20 Decode 延迟：9.0 -> 9.1 -> 9.9 -> 10.1 ms/step — 稳定快约 2 倍（HBM 带宽优势）
+- Decode 吞吐急剧下降：910C 上 181 -> 62.2 -> 16.7 -> 8.5 tps/gpu（8K -> 256K）
 - **可视化建议**：双轴折线图 — Prefill 延迟和 Decode 吞吐 vs 序列长度，双平台对比
 
 ---
 
-## 幻灯片 10：mHC 内核融合优化
+## 幻灯片 13：P/D 分离比例
 
-- 四个优化级别：未融合 FP32 -> 融合 FP32（新默认）-> 融合 FP32+SP -> 融合 BF16+SP
-- Prefill 时间（910C，8K/4K）：10,144ms -> 2,492ms -> 1,706ms -> 1,650ms
-- mHC 占比变化：84.3% -> 36.0% -> 6.6% -> 3.4%
-- 融合将 mHC HBM 流量减少约 10 倍（中间结果保留在寄存器/SRAM）
-- 融合后瓶颈迁移至注意力投影（CUBE 受限）— 910C 的 2.54 倍算力优势发挥空间更大
-- **可视化建议**：堆叠柱状图，展示四个级别下各类别时间占比和总 Prefill 时间
-
----
-
-## 幻灯片 11：P/D 分离服务概念
-
-- Prefill/Decode 分离服务：P 实例处理输入 token（Prefill 阶段），D 实例生成输出 token（Decode 阶段）
-- QPS 平衡方程：N_p x P_rps >= N_d x D_rps
-- P:D 比例公式：N_p/N_d >= (D_tps_instance x input_len) / (P_tps_instance x output_len)
-- 比例由输入/输出长度不平衡驱动：8K/4K 为 2:1 -> 256K/4K 为 64:1
-- 混合（非分离）服务在长上下文下浪费 60--80% 的 GPU 资源
-- **可视化建议**：概念图，展示 P 实例向 D 实例输送请求的 QPS 流向箭头
+- 公式：N_p/N_d >= (D_tps_instance x input_len) / (P_tps_instance x output_len)
+- 910C：1P:1D (8K, 32 GPUs)、1P:1D (32K, 48 GPUs)、2P:1D (128K, 64 GPUs)、3P:1D (256K, 80 GPUs)
+- H20：1P:1D (8K, 24 GPUs)、2P:1D (32K, 32 GPUs)、4P:1D (128K, 48 GPUs)、14P:1D (256K, 144 GPUs)
+- 256K 下 910C 需 80 GPUs vs H20 需 144 GPUs — 910C 少 44%（因 H20 极端 P:D 比例）
+- 内核融合显著改善 910C P:D 比例（128K：原 4:1 降为 2:1）
+- **可视化建议**：堆叠柱状图，展示各场景/平台 Prefill GPU 数 + Decode GPU 数；P:D 比例表格
 
 ---
 
-## 幻灯片 12：P/D 比例结果表
+## 幻灯片 14：mHC 优化 — 四个级别
 
-- 910C 8K/4K：1P:1D（P=16 GPUs，D=16 GPUs）— 32 GPUs 总计
-- 910C 128K/4K：2P:1D（P=2x16 GPUs，D=1x32 GPUs）— 64 GPUs 总计
-- 910C 256K/4K：3P:1D（P=3x16 GPUs，D=1x32 GPUs）— 80 GPUs 总计
-- H20 8K/4K：1P:1D（24 GPUs），128K/4K：4P:1D（48 GPUs），256K/4K：14P:1D（144 GPUs）
-- 910C 的 mHC 融合使 P:D 比例更有利，尤其在长上下文时优势明显
-- **可视化建议**：表格配合颜色渐变，展示各场景和平台的 P:D 比例递增趋势
-
----
-
-## 幻灯片 13：P/D GPU 预算分析
-
-- 8K/4K：910C 32 GPUs vs H20 24 GPUs — H20 少 25%
-- 128K/4K：910C 64 GPUs vs H20 48 GPUs — H20 少 25%
-- 256K/4K：910C 80 GPUs vs H20 144 GPUs — **910C 少 44%**
-- 256K 下 910C 反超 H20，得益于 mHC 融合降低了 P:D 比例
-- GPU 预算从 8K 到 256K 增长 2.5--6 倍 — 长上下文服务本质上代价高昂
-- **可视化建议**：堆叠柱状图，展示各场景/平台的 Prefill GPU 数 + Decode GPU 数
+- 未融合 FP32：Prefill 10,144ms，mHC = 84.3%（原始基线）
+- 融合 FP32（默认）：2,492ms，mHC = 36.0% — 4.07 倍加速，融合消除 HBM 往返
+- 融合 FP32 + SP：1,706ms，mHC = 6.6% — 5.95 倍加速，mHC 在 TP rank 间并行化
+- 融合 BF16 + SP：1,650ms，mHC = 3.4% — 6.15 倍总加速
+- 完全优化后瓶颈迁移至 Attn Proj（38.1%）和通信（28.0%）— CUBE 受限区域
+- **可视化建议**：瀑布图，展示各 mHC 优化阶段的时间缩减和每级 mHC 占比
 
 ---
 
-## 幻灯片 14：SP 与 mHC-SP 对比
+## 幻灯片 15：mHC 瓶颈迁移
 
-- 三种配置测试：无 SP（基线）、仅 SP、SP + mHC-SP
-- 仅 SP：910C 上提升 29%（8K），H20 上提升 48%（8K），因减少了 EP AllToAll 开销
-- 910C 8K 下 mHC-SP：mHC 占比从 36% 降至 6.6%（整体加速 2.06 倍）
-- mHC-SP 收益随序列长度递减：8K 为 2.1 倍，128K 为 1.4 倍，256K 为 1.2 倍
-- mHC-SP 原理：将 FP32 mHC 操作在 TP 维度并行化（TP=8 -> mHC 减少约 8 倍）
-- **可视化建议**：分组柱状图，展示三种配置下 8K/128K/256K 的 Prefill 时间（ms）
-
----
-
-## 幻灯片 15：算子瓶颈分析 — Prefill 阶段
-
-- 注意力投影：CUBE 瓶颈（计算密集型矩阵乘法）— 融合后成为最大瓶颈（25%--38%）
-- 注意力计算：CUBE 瓶颈（随序列长度二次增长）
-- mHC 前/后投影：MEM 瓶颈，融合后占比大幅下降（84% -> 36%）
-- Sinkhorn：910C 上 VEC 瓶颈（纯 FP32 向量运算，无矩阵乘法并行性）
-- MoE 门控和路由专家：Prefill 阶段 CUBE 瓶颈
-- **可视化建议**：表格，按类别标注瓶颈类型（CUBE / VEC / MEM / COMM），颜色编码
+- 未融合：mHC = 84.3%，Attn Proj = 6.2%，通信 = 4.6% — mHC 压倒一切
+- 融合：mHC = 36.0%，Attn Proj = 25.2%，通信 = 18.6% — 分布更均衡
+- 融合+SP：mHC = 6.6%，Attn Proj = 36.9%，通信 = 27.1% — 注意力投影成为主导
+- 融合 BF16+SP：mHC = 3.4%，Attn Proj = 38.1%，通信 = 28.0% — mHC 已基本消除
+- 启示：融合将瓶颈从 MEM（mHC）转移到 CUBE（注意力）— 910C 2.54 倍算力优势的发力点
+- **可视化建议**：堆叠柱状图，展示各优化级别的类别占比，箭头标注瓶颈迁移方向
 
 ---
 
-## 幻灯片 16：算子瓶颈分析 — Decode 阶段
+## 幻灯片 16：SP/mHC-SP 对比（融合基线）
 
-- MoE 路由专家：MEM 瓶颈（权重加载主导，占 910C Decode 的 40--56%）
-- 注意力投影：MEM 瓶颈（单 token Decode -> 低算术强度）
-- 注意力计算：MEM 瓶颈（KV 缓存读取主导）
-- mHC：MEM 瓶颈（融合后占比极低，0.3--4%）
-- 通信：COMM 瓶颈（MoE 的 AllToAll，注意力的 AllReduce）
-- **可视化建议**：表格，按类别标注瓶颈类型；与 Prefill 幻灯片并排对比
-
----
-
-## 幻灯片 17：Prefill 时间分解（类别占比 %）
-
-- 910C 8K（融合基线）：注意力投影 = 25.4%，通信 = 18.1%，mHC = 36.3%，注意力计算 = 7.8%
-- 910C 128K：注意力计算 = 31.6%，Lightning Index = 28.2%，mHC = 16.7%
-- 910C 256K：注意力计算 = 39.0%，Lightning Index = 35.5%，mHC = 10.6%
-- H20 8K：注意力投影 = 36.0%，通信 = 26.6%，注意力计算 = 11.0%，mHC = 9.1%
-- 随序列长度增加，注意力计算二次增长，成为主要瓶颈
-- **可视化建议**：堆叠柱状图（或堆叠面积图），展示各场景和平台的类别占比分解
+- 910C 无 SP -> SP+mHC-SP 加速：2.06 倍（8K）、1.79 倍（32K）、1.39 倍（128K）、1.23 倍（256K）
+- H20 无 SP -> SP+mHC-SP 加速：2.90 倍（8K）、2.48 倍（32K）、1.78 倍（128K）、1.48 倍（256K）
+- 仅 SP：H20 受益更大（8K 下 2.67 倍），因其大幅减少了昂贵的 EP AllToAll（50 GB/s）
+- 仅 SP：910C 受益较小（8K 下 1.41 倍），因 EP 带宽本身已较快（392 GB/s）
+- 长上下文下加速递减，因二次增长的注意力计算不受 SP/mHC-SP 影响
+- **可视化建议**：分组柱状图，展示无 SP / SP / SP+mHC-SP 三种配置在 8K/32K/128K/256K 下的 Prefill 时间
 
 ---
 
-## 幻灯片 18：910C vs H20 对比总结
+## 幻灯片 17：注意力与 KV 缓存分析
 
-- Prefill 吞吐：融合后 H20 仅胜出 1.03--1.12 倍（原 1.62--2.57 倍差距大幅缩小）
-- Prefill 延迟：910C 全面胜出 1.68--1.94 倍（mHC 融合 + Cube 算力优势）
-- Decode 延迟：H20 稳定胜出约 2 倍（直接反映 2.2 倍 HBM 带宽比）
-- 910C EP 带宽（7.84 倍）支持 EP=32/64 配置，H20 上代价过高
-- 256K 下 910C 总 GPU 数更少（80 vs 144），mHC 融合使 P:D 比例更有利
-- **可视化建议**：总结对比表，用绿色/红色箭头标注各指标的平台优势
-
----
-
-## 幻灯片 19：行业启示与优化机会
-
-- KV 压缩（C4A/C128A）不可或缺：无压缩时 128K 上下文在合理 batch 下不可行
-- mHC 内核融合是最高 ROI 已实现优化：4 倍 Prefill 加速，默认开启
-- 进一步优化：mHC-SP（1.5--2 倍额外加速）、BF16 精度（约 3% 额外提升）
-- Cube:Vec 比影响显著：910C 的 15.7:1 导致 FP32 归一化工作负载下 vec/mem 严重闲置
-- HBM 带宽是 Decode 阶段的关键差异化因素：对话类负载中 HBM 带宽 > 计算 TFLOPS
-- MoE 模型强烈依赖高带宽互联：NVLink 域内高效，跨节点 MoE 代价高昂
-- **可视化建议**：矩阵图，将优化机会映射到影响程度（高/中/低）和实施难度
+- V4 128K 下 KV 缓存：2.18 GB vs V3 MLA：9.21 GB vs 无压缩：11.54 GB — 比 V3 节省 4.2 倍
+- 按层分解：C4A 层占 KV 缓存 71--73%，2 层全注意力占 23--25%（尽管仅占 43 层中的 2 层）
+- Decode 延迟跨上下文稳定：17.9ms (1K) 至 21.0ms (128K) — 压缩有效控制注意力开销
+- 注意力计算扩展：全注意力层 65%->96% 注意力主导（8K->128K）；C128A 维持 31%->54%
+- 多比例压缩策略验证：C128A 在超长上下文下仍保持大多数层的高效运行
+- **可视化建议**：双图 — KV 缓存大小对比（V4 vs V3 vs 无压缩）和 Decode 延迟 vs 序列长度
 
 ---
 
-## 幻灯片 20：部署建议
+## 幻灯片 18：按场景部署建议
 
-- 8K/4K（对话/编程）：910C = 32 GPUs（1P:1D），H20 = 24 GPUs（1P:1D）
-- 128K/4K（RAG/文档问答）：910C = 64 GPUs（2P:1D），H20 = 48 GPUs（4P:1D）；P/D 分离必不可少
-- 256K/4K（全文档分析）：910C = 80 GPUs（3P:1D），H20 = 144 GPUs（14P:1D）；910C 更具成本效益
-- 通用建议：始终启用 SP 和 mHC 内核融合（均为默认值），研究 mHC-SP 可行性
-- 按网络调优 EP（910C 高 EP，H20 低 EP）；Decode 阶段积极增大 batch；128K+ 必须采用 P/D 分离
-- **可视化建议**：决策流程图或按使用场景分类的推荐配置表，包含平台特定参数
+- 8K/4K（对话/编程）：910C = 32 GPUs (1P:1D)，H20 = 24 GPUs (1P:1D)；两平台均高效
+- 32K/4K（文档处理）：910C = 48 GPUs (1P:1D)，H20 = 32 GPUs (2P:1D)；H20 更具成本效益
+- 128K/4K（RAG/文档问答）：910C = 64 GPUs (2P:1D)，H20 = 48 GPUs (4P:1D)；P/D 分离必不可少
+- 256K/4K（全文档分析）：910C = 80 GPUs (3P:1D)，H20 = 144 GPUs (14P:1D)；910C 更具 GPU 效率
+- 通用建议：启用内核融合 + SP（默认），按网络调优 EP，Decode 阶段积极增大 batch
+- **可视化建议**：决策流程图或按使用场景分类的推荐配置表，包含平台特定参数和 GPU 数量
+
+---
+
+## 幻灯片 19：行业启示
+
+- 软件优化改变硬件竞争格局：mHC 融合使 910C 从落后 2.57 倍变为接近持平
+- KV 压缩是长上下文的必备条件：无压缩时 128K 在合理 batch 下不可行
+- HBM 带宽仍是 Decode 的关键差异化因素：对话类负载中 HBM 带宽 > 计算 TFLOPS
+- EP 带宽对 MoE 至关重要：910C 7.84 倍优势支持 EP=64；H20 被迫 EP=8
+- P/D 分离架构对 128K+ 必不可少（混合服务浪费 60--80% 资源）
+- 256K 服务在两平台上代价均高昂（Prefill 延迟 34s/66s）— 需要分块策略
+- **可视化建议**：矩阵图，将启示映射到影响程度（高/中/低）和平台相关性
+
+---
+
+## 幻灯片 20：附录 — 方法论与数据来源
+
+- Roofline 模型：每个算子时间 = max(cube, vec, mem) + comm；利用率：计算 50%，HBM 带宽 80%
+- 浮点运算：矩阵乘法 [M,K]x[K,N] = MxNxKx2；BF16 = 2 字节，FP32 = 4 字节
+- 搜索空间：TP 属于 {1..64}，EP 属于 {1..256}，DP 属于 {1..8}，BS 属于 {1..512}；约束 (TP x DP) % EP == 0
+- 通信模型：AllReduce = 2(n-1)/n x vol/BW，AllToAll = (n-1)/n x vol/BW，AllGather = (n-1)/n x vol/BW
+- 局限性：通信建模为累加（不与计算重叠），假设 Flash Attention 内存模型
+- 原始数据：search_results、pd_ratio_analysis、op_analysis、sp_comparison、mhc_optimization、kv_cache_scaling 等 JSON 文件
+- **可视化建议**：Roofline 图，展示算力 vs 访存强度，标注示例算子位置

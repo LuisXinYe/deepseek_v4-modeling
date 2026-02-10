@@ -57,6 +57,13 @@ param_search/             # Parameter search tool
   analyze.py              # Analyze results and generate search_report.md
   report.md               # Detailed analysis of search results
   results/                # Auto-generated: timestamped search results with CSVs
+report/                   # Analysis reports
+  analyze_scenarios.py    # Comprehensive analysis: search, P/D ratio, op analysis, V3 comparison
+  report_en.md            # Main analysis report (English, 8-section structure)
+  report_zh.md            # Main analysis report (Chinese translation)
+  ppt_outline_en.md       # PPT outline (English)
+  ppt_outline_zh.md       # PPT outline (Chinese)
+  data/                   # Auto-generated: 10 JSON data files
 ```
 
 ## Architecture
@@ -111,7 +118,7 @@ The search evaluates 4 independent scenarios:
 | Prefill Throughput | TP=8, EP=16, DP=2, BS=256 | 1,656 tok/s/GPU | 16 |
 | Decode Throughput | TP=4, EP=16, DP=4, BS=512 | 181 tok/s/GPU | 16 |
 
-See [`param_search/report.md`](param_search/report.md) for detailed analysis including per-sequence-length breakdowns, SP impact, batch scaling, and deployment recommendations.
+See [`param_search/report.md`](param_search/report.md) for detailed search analysis and [`report/report_en.md`](report/report_en.md) for the comprehensive 8-section analysis (V4 vs V3 comparison, bottleneck analysis, 4 serving combos: 8K/32K/128K/256K, mHC optimization, KV cache scaling, deployment recommendations).
 
 ## Key Assumptions
 

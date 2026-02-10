@@ -2,4 +2,6 @@ __pycache__/
 *.pyc
 output/
 **results/
-.claude/
+report/data/
+.claude/*
+!.claude/commands/
