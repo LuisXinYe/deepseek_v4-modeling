@@ -13,21 +13,20 @@ from perf_model.memory import kv_cache_memory, weight_memory_per_rank
 class TestKVCacheMemory(unittest.TestCase):
     """kv_cache_memory per-layer and total KV cache sizing."""
 
-    def test_ratio1_full_cache(self):
-        """ratio=1 layer: full cache = B * S * (k_dim + v_dim) * 2."""
+    def test_ratio1_swa_cache(self):
+        """ratio=1 layer: SWA cache = B * W * kv_dim * 2 (K=V shared, window only)."""
         cfg = make_config()
         result = kv_cache_memory(cfg)
         B = cfg.rt.batch_size // cfg.rt.dp
-        S = cfg.rt.seq_len
-        k_dim = cfg.model.k_dim
-        v_dim = cfg.model.v_dim
-        expected = B * S * (k_dim + v_dim) * 2
+        W = cfg.model.window_size
+        kv_dim = cfg.model.kv_dim
+        expected = B * W * kv_dim * 2
         layer0 = result["layers"][0]
-        self.assertEqual(layer0["type"], "full")
+        self.assertEqual(layer0["type"], "SWA")
         self.assertEqual(layer0["bytes"], expected)
 
     def test_ratio4_compressed_with_index(self):
-        """ratio=4 layer: compressed + SWA + index (S//4=32 > topK=16)."""
+        """ratio=4 layer: compressed + SWA + index (S//4=32 > topK=16). K=V shared."""
         cfg = make_config()
         result = kv_cache_memory(cfg)
         B = cfg.rt.batch_size // cfg.rt.dp
@@ -42,8 +41,8 @@ class TestKVCacheMemory(unittest.TestCase):
         layer1 = result["layers"][1]
         self.assertEqual(layer1["type"], "C4A")
 
-        comp_bytes = B * S_comp * (m.compress_c_k + m.compress_c_v) * 2
-        swa_bytes = B * m.window_size * (m.k_dim + m.v_dim) * 2
+        comp_bytes = B * S_comp * m.compress_c_kv * 2
+        swa_bytes = B * m.window_size * m.kv_dim * 2
         idx_bytes = B * S_comp * m.index_head_dim * 2
 
         self.assertEqual(layer1["comp_bytes"], comp_bytes)
@@ -53,7 +52,7 @@ class TestKVCacheMemory(unittest.TestCase):
         self.assertEqual(layer1["bytes"], comp_bytes + swa_bytes + idx_bytes)
 
     def test_ratio128_no_index(self):
-        """ratio=128 layer: S//128=1, not > topK=16, so NO index cache."""
+        """ratio=128 layer: S//128=1, not > topK=16, so NO index cache. K=V shared."""
         cfg = make_config()
         result = kv_cache_memory(cfg)
         B = cfg.rt.batch_size // cfg.rt.dp
@@ -68,8 +67,8 @@ class TestKVCacheMemory(unittest.TestCase):
         layer2 = result["layers"][2]
         self.assertEqual(layer2["type"], "C128A")
 
-        comp_bytes = B * S_comp * (m.compress_c_k + m.compress_c_v) * 2
-        swa_bytes = B * m.window_size * (m.k_dim + m.v_dim) * 2
+        comp_bytes = B * S_comp * m.compress_c_kv * 2
+        swa_bytes = B * m.window_size * m.kv_dim * 2
 
         self.assertEqual(layer2["comp_bytes"], comp_bytes)
         self.assertEqual(layer2["swa_bytes"], swa_bytes)
@@ -101,10 +100,10 @@ class TestKVCacheMemory(unittest.TestCase):
             self.assertIn(i, result["layers"])
 
     def test_layer_type_labels(self):
-        """Layer type labels correct: 'full', 'C4A', 'C128A'."""
+        """Layer type labels correct: 'SWA', 'C4A', 'C128A'."""
         cfg = make_config()
         result = kv_cache_memory(cfg)
-        self.assertEqual(result["layers"][0]["type"], "full")
+        self.assertEqual(result["layers"][0]["type"], "SWA")
         self.assertEqual(result["layers"][1]["type"], "C4A")
         self.assertEqual(result["layers"][2]["type"], "C128A")
         self.assertEqual(result["layers"][3]["type"], "C4A")
@@ -123,7 +122,7 @@ class TestWeightMemory(unittest.TestCase):
     """weight_memory_per_rank formula verification."""
 
     def test_attn_per_layer_formula(self):
-        """attn_per_layer = bytes2(w_dq + w_uq + w_k + w_v + w_wo_a + w_wo_b) with TP splitting."""
+        """attn_per_layer = bytes2(w_dq + w_uq + w_kv + w_wo_a + w_wo_b) with TP splitting."""
         cfg = make_config()
         result = weight_memory_per_rank(cfg)
         m = cfg.model
@@ -132,13 +131,12 @@ class TestWeightMemory(unittest.TestCase):
 
         w_dq = H * m.q_lora_rank
         w_uq = m.q_lora_rank * (m.num_attention_heads // TP) * (m.head_dim + m.rope_head_dim)
-        w_k = H * m.k_dim
-        w_v = H * m.v_dim
+        w_kv = H * m.kv_dim
         Ng = m.o_groups
         w_wo_a = (Ng // TP) * (m.num_attention_heads // Ng) * m.head_dim * m.o_lora_rank
         w_wo_b = (m.o_mid_dim // TP) * H
 
-        expected = bytes2(w_dq + w_uq + w_k + w_v + w_wo_a + w_wo_b)
+        expected = bytes2(w_dq + w_uq + w_kv + w_wo_a + w_wo_b)
         self.assertEqual(result["attn_per_layer"], expected)
 
     def test_moe_per_layer_formula(self):
@@ -200,11 +198,11 @@ class TestWeightMemory(unittest.TestCase):
         self.assertEqual(result["lm_head"], bytes2(H * (m.vocab_size // TP)))
 
     def test_layer_type_counts(self):
-        """n_full_layers and n_comp_layers counts correct for [1,4,128,4]."""
+        """n_swa_layers and n_comp_layers counts correct for [1,4,128,4]."""
         cfg = make_config()
         result = weight_memory_per_rank(cfg)
         # compress_ratios = [1, 4, 128, 4]
-        self.assertEqual(result["n_full_layers"], 1)
+        self.assertEqual(result["n_swa_layers"], 1)
         self.assertEqual(result["n_comp_layers"], 3)
 
 

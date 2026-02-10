@@ -14,17 +14,19 @@ def kv_cache_memory(cfg: Config) -> dict:
     for i in range(cfg.model.num_hidden_layers):
         ratio = cfg.model.compress_ratios[i]
         if ratio == 1:
-            # Full KV: S * (k_dim + v_dim) * 2 per batch
-            layer_bytes = B * S * (cfg.model.k_dim + cfg.model.v_dim) * 2
-            layers[i] = {"type": "full", "bytes": layer_bytes}
+            # SWA KV: window_size * kv_dim * 2 per batch (K=V shared)
+            # FIXME: change this to bytes2() function
+            W = cfg.model.window_size
+            layer_bytes = B * W * cfg.model.kv_dim * 2
+            layers[i] = {"type": "SWA", "bytes": layer_bytes}
         else:
-            # Compressed KV
+            # Compressed KV (K=V shared)
             S_comp = S // ratio
-            comp_bytes = B * S_comp * (cfg.model.compress_c_k + cfg.model.compress_c_v) * 2
-            # SWA window (fixed size)
-            swa_bytes = B * cfg.model.window_size * (cfg.model.k_dim + cfg.model.v_dim) * 2
+            comp_bytes = B * S_comp * cfg.model.compress_c_kv * 2
+            # SWA window (fixed size, K=V shared)
+            swa_bytes = B * cfg.model.window_size * cfg.model.kv_dim * 2
             # Index K cache (only for layers that use Lightning Index)
-            use_index = S_comp > cfg.model.index_topk
+            use_index = (ratio==4)
             idx_bytes = B * S_comp * cfg.model.index_head_dim * 2 if use_index else 0
             layer_bytes = comp_bytes + swa_bytes + idx_bytes
             layer_info = {
@@ -53,24 +55,21 @@ def weight_memory_per_rank(cfg: Config) -> dict:
     w_dq = H * m.q_lora_rank
     # W_uq: [q_lora_rank, Nq/TP * (Dqc + Dr)]
     w_uq = m.q_lora_rank * (m.num_attention_heads // TP) * (m.head_dim + m.rope_head_dim)
-    # W_k: [H, k_dim] — replicated (MQA)
-    w_k = H * m.k_dim
-    # W_v: [H, v_dim] — replicated (MQA)
-    w_v = H * m.v_dim
+    # W_kv: [H, kv_dim] — replicated (MQA, K=V shared)
+    w_kv = H * m.kv_dim
     # wo_a: Ng/TP blocks of [Nq/Ng * Dqc, o_lora_rank]
     Ng = m.o_groups
     w_wo_a = (Ng // TP) * (m.num_attention_heads // Ng) * m.head_dim * m.o_lora_rank
     # wo_b: [o_mid_dim/TP, H]
     w_wo_b = (m.o_mid_dim // TP) * H
 
-    attn_per_layer = bytes2(w_dq + w_uq + w_k + w_v + w_wo_a + w_wo_b)
+    attn_per_layer = bytes2(w_dq + w_uq + w_kv + w_wo_a + w_wo_b)
 
     # Index weights (only for ratio > 1 layers)
     # W_iq: [H, index_n_heads/TP * index_head_dim]
     w_iq = H * (m.index_n_heads // TP) * m.index_head_dim
-    # W_ik: [H, index_head_dim] — replicated
-    w_ik = H * m.index_head_dim
-    index_per_layer = bytes2(w_iq + w_ik)
+    # No separate W_ik — Lightning Index compression maps hidden → index_head_dim directly
+    index_per_layer = bytes2(w_iq)
 
     # --- MoE weights (per layer, per rank) ---
     # Gate: [H, n_routed_experts] — replicated
@@ -91,7 +90,7 @@ def weight_memory_per_rank(cfg: Config) -> dict:
 
     # Count layers by type
     S = cfg.rt.seq_len
-    n_full = sum(1 for r in m.compress_ratios if r == 1)
+    n_swa = sum(1 for r in m.compress_ratios if r == 1)
     n_comp = sum(1 for r in m.compress_ratios if r > 1)
     # Index weights only for layers that use Lightning Index (S//ratio > topK)
     n_index = sum(1 for r in m.compress_ratios if r > 1 and S // r > m.index_topk)
@@ -117,7 +116,7 @@ def weight_memory_per_rank(cfg: Config) -> dict:
         "moe_per_layer": moe_per_layer,
         "mhc_per_layer": mhc_per_layer,
         "norm_per_layer": norm_per_layer,
-        "n_full_layers": n_full,
+        "n_swa_layers": n_swa,
         "n_comp_layers": n_comp,
         "total_attn": total_attn,
         "total_moe": total_moe,

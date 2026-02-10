@@ -6,14 +6,14 @@ from typing import List, Optional
 from .config import Config
 from .roofline import OpProfile, sum_ops
 from .ops import (
-    op_q_proj_dq, op_q_proj_uq, op_k_proj, op_v_proj, op_wo_a, op_wo_b,
+    op_q_proj_dq, op_q_proj_uq, op_kv_proj, op_wo_a, op_wo_b,
     op_attn_tp_allreduce,
-    op_index_iq_proj, op_index_ik_proj, op_index_kv_compression_prefill, op_index_kv_compression_decode,
+    op_index_iq_proj, op_index_kv_compression_prefill, op_index_kv_compression_decode,
     op_index_score, op_index_score_allreduce,
     op_index_score_decode, op_index_score_allreduce_decode,
     op_kv_compression_prefill, op_kv_compression_decode,
-    op_attention_prefill_full, op_attention_prefill_compressed,
-    op_attention_decode_full, op_attention_decode_compressed,
+    op_attention_prefill_swa, op_attention_prefill_compressed,
+    op_attention_decode_swa, op_attention_decode_compressed,
     op_mhc_pre, op_mhc_sinkhorn, op_mhc_post,
     op_mhc_pre_fused, op_mhc_post_fused, op_mhc_post_pre_fused,
     op_moe_gate, op_moe_ep_dispatch, op_moe_ep_combine,
@@ -61,11 +61,10 @@ def prefill_layer(layer_idx: int, cfg: Config) -> LayerProfile:
     # SP AllGather: T_sp -> T_full before attention projections
     ops.append(op_sp_allgather(T_sp, cfg, "sp_ag_before_attn"))
 
-    # Q/K/V projections (T_full tokens, weights split by TP for Q)
+    # Q/KV projections (T_full tokens, weights split by TP for Q; K=V shared)
     ops.append(op_q_proj_dq(T_full, cfg))
     ops.append(op_q_proj_uq(T_full, cfg))
-    ops.append(op_k_proj(T_full, cfg))
-    ops.append(op_v_proj(T_full, cfg))
+    ops.append(op_kv_proj(T_full, cfg))
 
     # Determine if this layer uses Lightning Index
     # Index is needed when compressed seq len > topK (e.g. C4A: S//4=1024 > 512)
@@ -77,7 +76,6 @@ def prefill_layer(layer_idx: int, cfg: Config) -> LayerProfile:
     # Index + Compression (only for layers that use Lightning Index)
     if use_index:
         ops.append(op_index_iq_proj(T_full, cfg))
-        ops.append(op_index_ik_proj(T_full, cfg))
         ops.append(op_index_kv_compression_prefill(B, S, ratio, cfg))
         ops.append(op_index_score(B, S, ratio, cfg))
         ops.append(op_index_score_allreduce(B, S, ratio, cfg))
@@ -87,9 +85,8 @@ def prefill_layer(layer_idx: int, cfg: Config) -> LayerProfile:
         ops.append(op_kv_compression_prefill(B, S, ratio, cfg))
 
     # Attention
-    if ratio == 1:
-        ops.append(op_attention_prefill_full(B, S, cfg))
-    else:
+    ops.append(op_attention_prefill_swa(B, S, cfg))
+    if ratio > 1:
         ops.append(op_attention_prefill_compressed(B, S, ratio, cfg, use_index=use_index))
 
     # Output projection
@@ -175,11 +172,10 @@ def decode_layer(layer_idx: int, S_total: int, cfg: Config) -> LayerProfile:
     # RMSNorm
     ops.append(op_rmsnorm(T_full, cfg, "rmsnorm_attn"))
 
-    # Q/K/V projections
+    # Q/KV projections (K=V shared)
     ops.append(op_q_proj_dq(T_full, cfg))
     ops.append(op_q_proj_uq(T_full, cfg))
-    ops.append(op_k_proj(T_full, cfg))
-    ops.append(op_v_proj(T_full, cfg))
+    ops.append(op_kv_proj(T_full, cfg))
 
     # Determine if this layer uses Lightning Index
     S_comp = S_total // ratio if ratio > 1 else S_total
@@ -188,7 +184,6 @@ def decode_layer(layer_idx: int, S_total: int, cfg: Config) -> LayerProfile:
     # Index (only for layers that use Lightning Index)
     if use_index:
         ops.append(op_index_iq_proj(T_full, cfg))
-        ops.append(op_index_ik_proj(T_full, cfg))
         ops.append(op_index_kv_compression_decode(B, S_total, ratio, cfg))
         ops.append(op_index_score_decode(B, S_total, ratio, cfg))
         ops.append(op_index_score_allreduce_decode(B, S_total, ratio, cfg))
@@ -198,9 +193,8 @@ def decode_layer(layer_idx: int, S_total: int, cfg: Config) -> LayerProfile:
         ops.append(op_kv_compression_decode(B, S_total, ratio, cfg))
 
     # Attention
-    if ratio == 1:
-        ops.append(op_attention_decode_full(B, S_total, cfg))
-    else:
+    ops.append(op_attention_decode_swa(B, S_total, cfg))
+    if ratio > 1:
         ops.append(op_attention_decode_compressed(B, S_total, ratio, cfg, use_index=use_index))
 
     # Output projection

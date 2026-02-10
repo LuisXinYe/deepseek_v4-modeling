@@ -65,21 +65,19 @@ class TestModelConfig(unittest.TestCase):
         m = ModelConfig()
         self.assertEqual(m.num_kv_heads, 1)
 
-    def test_k_dim(self):
+    def test_kv_dim(self):
         m = ModelConfig()
-        self.assertEqual(m.k_dim, m.head_dim)
+        self.assertEqual(m.kv_dim, m.head_dim)
 
-    def test_v_dim(self):
+    def test_compress_c_kv(self):
         m = ModelConfig()
-        self.assertEqual(m.v_dim, m.head_dim)
+        self.assertEqual(m.compress_c_kv, m.head_dim)
 
-    def test_compress_c_k(self):
+    def test_compress_coeff(self):
         m = ModelConfig()
-        self.assertEqual(m.compress_c_k, m.head_dim)
-
-    def test_compress_c_v(self):
-        m = ModelConfig()
-        self.assertEqual(m.compress_c_v, m.head_dim)
+        self.assertEqual(m.compress_coeff(1), 0.0)
+        self.assertEqual(m.compress_coeff(4), 1.0)
+        self.assertEqual(m.compress_coeff(128), 0.5)
 
     def test_o_mid_dim(self):
         m = ModelConfig()
@@ -88,10 +86,8 @@ class TestModelConfig(unittest.TestCase):
 
     def test_properties_with_custom_values(self):
         m = ModelConfig(head_dim=256, o_groups=4, o_lora_rank=512)
-        self.assertEqual(m.k_dim, 256)
-        self.assertEqual(m.v_dim, 256)
-        self.assertEqual(m.compress_c_k, 256)
-        self.assertEqual(m.compress_c_v, 256)
+        self.assertEqual(m.kv_dim, 256)
+        self.assertEqual(m.compress_c_kv, 256)
         self.assertEqual(m.o_mid_dim, 4 * 512)
 
 

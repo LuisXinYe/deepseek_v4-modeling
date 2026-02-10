@@ -64,30 +64,29 @@ class TestLayerProfile(unittest.TestCase):
 class TestPrefillLayer(unittest.TestCase):
     """prefill_layer for various layer types and config options."""
 
-    def test_ratio1_has_full_attention(self):
-        """ratio=1 (layer 0): has attention_full, no index/compression ops."""
+    def test_ratio1_has_swa_attention(self):
+        """ratio=1 (layer 0): has attention_swa, no index/compression ops."""
         cfg = make_config()
         lp = prefill_layer(0, cfg)
         self.assertEqual(lp.ratio, 1)
         names = [op.name for op in lp.ops]
-        self.assertIn("attention_full", names)
+        self.assertIn("attention_swa", names)
+        self.assertNotIn("attention_comp", names)
         self.assertNotIn("index_iq_proj", names)
-        self.assertNotIn("index_ik_proj", names)
         self.assertNotIn("index_kv_compress", names)
         self.assertNotIn("kv_compression", names)
 
     def test_ratio4_has_index_and_compression(self):
-        """ratio=4 (layer 1): has index + compression + compressed attention."""
+        """ratio=4 (layer 1): has SWA + index + compression + compressed attention."""
         cfg = make_config()
         lp = prefill_layer(1, cfg)
         self.assertEqual(lp.ratio, 4)
         names = [op.name for op in lp.ops]
+        self.assertIn("attention_swa", names)
         self.assertIn("index_iq_proj", names)
-        self.assertIn("index_ik_proj", names)
         self.assertIn("index_kv_compress", names)
         self.assertIn("kv_compression", names)
         self.assertIn("attention_comp", names)
-        self.assertNotIn("attention_full", names)
 
     def test_ratio128_no_index(self):
         """ratio=128 (layer 2): use_index is hardcoded as (ratio==4), so no index ops.
@@ -98,9 +97,9 @@ class TestPrefillLayer(unittest.TestCase):
         names = [op.name for op in lp.ops]
         # No index ops (use_index = ratio==4 is False for ratio=128)
         self.assertNotIn("index_iq_proj", names)
-        self.assertNotIn("index_ik_proj", names)
         self.assertNotIn("index_kv_compress", names)
-        # But KV compression IS present (ratio > 1)
+        # But SWA + KV compression + compressed attention ARE present
+        self.assertIn("attention_swa", names)
         self.assertIn("kv_compression", names)
         self.assertIn("attention_comp", names)
 
@@ -197,13 +196,13 @@ class TestPrefillLayer(unittest.TestCase):
 class TestDecodeLayer(unittest.TestCase):
     """decode_layer for various layer types."""
 
-    def test_ratio1_full_attention(self):
-        """ratio=1: has attention_full in decode."""
+    def test_ratio1_swa_attention(self):
+        """ratio=1: has attention_swa in decode, no attention_comp."""
         cfg = make_config()
         lp = decode_layer(0, 256, cfg)
         self.assertEqual(lp.ratio, 1)
         names = [op.name for op in lp.ops]
-        self.assertIn("attention_full", names)
+        self.assertIn("attention_swa", names)
         self.assertNotIn("attention_comp", names)
 
     def test_ratio4_use_index_condition(self):
@@ -213,7 +212,6 @@ class TestDecodeLayer(unittest.TestCase):
         lp = decode_layer(1, 256, cfg)  # layer 1 has ratio=4
         names = [op.name for op in lp.ops]
         self.assertIn("index_iq_proj", names)
-        self.assertIn("index_ik_proj", names)
 
     def test_ratio4_no_index_when_s_comp_small(self):
         """S_total=32, ratio=4 => S_comp=8 < topK=16 => use_index=False."""
@@ -221,7 +219,6 @@ class TestDecodeLayer(unittest.TestCase):
         lp = decode_layer(1, 32, cfg)  # layer 1 has ratio=4
         names = [op.name for op in lp.ops]
         self.assertNotIn("index_iq_proj", names)
-        self.assertNotIn("index_ik_proj", names)
         # KV compression still present
         self.assertIn("kv_compression_decode", names)
 

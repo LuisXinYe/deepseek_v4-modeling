@@ -3,7 +3,7 @@
 import unittest
 
 from test.helpers import make_config, assert_op_valid
-from perf_model.roofline import bytes2
+from perf_model.roofline import bytes2, bytes4
 from perf_model import ops
 
 
@@ -45,24 +45,14 @@ class TestAttentionProjections(unittest.TestCase):
         # TP=4 should have half the flops of TP=2
         self.assertEqual(op_tp4.flops, op_tp2.flops / 2)
 
-    def test_k_proj_flops(self):
+    def test_kv_proj_flops(self):
         cfg = make_config()
         T = 256
-        op = ops.op_k_proj(T, cfg)
+        op = ops.op_kv_proj(T, cfg)
         assert_op_valid(self, op)
         H = cfg.model.hidden_size   # 256
-        kd = cfg.model.k_dim        # head_dim = 64
-        expected_flops = T * H * kd * 2
-        self.assertEqual(op.flops, expected_flops)
-
-    def test_v_proj_flops(self):
-        cfg = make_config()
-        T = 256
-        op = ops.op_v_proj(T, cfg)
-        assert_op_valid(self, op)
-        H = cfg.model.hidden_size   # 256
-        vd = cfg.model.v_dim        # head_dim = 64
-        expected_flops = T * H * vd * 2
+        kv_d = cfg.model.kv_dim     # head_dim = 64
+        expected_flops = T * H * kv_d * 2
         self.assertEqual(op.flops, expected_flops)
 
     def test_wo_a_flops(self):
@@ -121,27 +111,19 @@ class TestLightningIndex(unittest.TestCase):
         expected_flops = T * in_dim * out_dim * 2
         self.assertEqual(op.flops, expected_flops)
 
-    def test_ik_proj_flops(self):
-        cfg = make_config()
-        T = 256
-        op = ops.op_index_ik_proj(T, cfg)
-        assert_op_valid(self, op)
-        H = cfg.model.hidden_size       # 256
-        hd = cfg.model.index_head_dim   # 32
-        expected_flops = T * H * hd * 2
-        self.assertEqual(op.flops, expected_flops)
-
     def test_index_kv_compression_prefill(self):
         cfg = make_config()
         B, S, ratio = 2, 128, 4
         op = ops.op_index_kv_compression_prefill(B, S, ratio, cfg)
         assert_op_valid(self, op)
+        H = cfg.model.hidden_size       # 256
         d = cfg.model.index_head_dim    # 32
         g = ratio                       # 4
         S_comp = S // g                 # 32
-        expected_cube = 8 * B * S * d**2 + (8 * g - 2) * B * d * S_comp
-        expected_vec = (4 * g + 1) * d * B * S_comp
-        expected_mem = bytes2(5 * B * S * d)
+        coeff = cfg.model.compress_coeff(ratio)  # 1.0
+        expected_cube = coeff * (8 * B * S * H * d + (8 * g - 2) * B * d * S_comp)
+        expected_vec = coeff * (4 * g + 1) * d * B * S_comp
+        expected_mem = bytes2(int(coeff * (B * S * H + H * d + B * S_comp * d)))
         self.assertEqual(op.flops, expected_cube)
         self.assertEqual(op.vec_ops, expected_vec)
         self.assertEqual(op.mem_bytes, expected_mem)
@@ -184,7 +166,7 @@ class TestLightningIndex(unittest.TestCase):
         nh = cfg.model.index_n_heads // TP
         hd = cfg.model.index_head_dim
         act_in = bytes2(B * nh * S * hd) + bytes2(B * S_comp * hd)
-        act_out = B * S * S_comp * 4  # FP32 scores
+        act_out = bytes4(B * S * S_comp)  # FP32 scores
         expected_mem = act_in + act_out
         self.assertEqual(op.mem_bytes, expected_mem)
 
@@ -194,35 +176,34 @@ class TestLightningIndex(unittest.TestCase):
         op = ops.op_index_score_allreduce(B, S, ratio, cfg)
         self.assertEqual(op.time_s, 0.0)
 
-    def test_index_score_allreduce_volume_fp32(self):
-        """Volume is FP32 = B*S*S_comp*4."""
+    def test_index_score_allreduce_volume_bf16(self):
+        """Volume is BF16 = bytes2(B*S*S_comp)."""
         cfg = make_config(tp=2)
         B, S, ratio = 2, 128, 4
         op = ops.op_index_score_allreduce(B, S, ratio, cfg)
         S_comp = S // ratio
-        expected_vol = B * S * S_comp * 4
+        expected_vol = bytes2(B * S * S_comp)
         self.assertEqual(op.comm_bytes, expected_vol)
         self.assertGreater(op.time_s, 0.0)
 
 
 class TestKVCompression(unittest.TestCase):
-    """Tests for KV compression ops (2x index version for K+V)."""
+    """Tests for KV compression ops (K=V shared, coeff-scaled)."""
 
-    def test_prefill_is_2x_index(self):
-        """KV compression prefill cube/vec should be 2x the index version."""
+    def test_prefill_formula(self):
+        """KV compression prefill: coeff * (H*c_kv projection + group compression)."""
         cfg = make_config()
         B, S, ratio = 2, 128, 4
-        idx_op = ops.op_index_kv_compression_prefill(B, S, ratio, cfg)
         kv_op = ops.op_kv_compression_prefill(B, S, ratio, cfg)
         assert_op_valid(self, kv_op)
-        # Cube uses head_dim for kv vs index_head_dim for index, so not simply 2x
-        # But we can verify the formula directly
-        d = cfg.model.head_dim           # 64
+        H = cfg.model.hidden_size        # 256
+        c_kv = cfg.model.compress_c_kv   # 64
         g = ratio                        # 4
         S_comp = S // g                  # 32
-        expected_cube = 2 * (8 * B * S * d**2 + (8 * g - 2) * B * d * S_comp)
-        expected_vec = 2 * (4 * g + 1) * d * B * S_comp
-        expected_mem = bytes2(2 * 5 * B * S * d)
+        coeff = cfg.model.compress_coeff(ratio)  # 1.0
+        expected_cube = coeff * (8 * B * S * H * c_kv + (8 * g - 2) * B * c_kv * S_comp)
+        expected_vec = coeff * (4 * g + 1) * c_kv * B * S_comp
+        expected_mem = bytes2(int(coeff * (B * S * H + H * c_kv + B * S_comp * c_kv)))
         self.assertEqual(kv_op.flops, expected_cube)
         self.assertEqual(kv_op.vec_ops, expected_vec)
         self.assertEqual(kv_op.mem_bytes, expected_mem)
@@ -255,39 +236,38 @@ class TestKVCompression(unittest.TestCase):
 class TestAttentionCompute(unittest.TestCase):
     """Tests for attention score computation (prefill and decode)."""
 
-    def test_prefill_full_flops(self):
+    def test_prefill_swa_flops(self):
         cfg = make_config()
         B, S = 2, 128
-        op = ops.op_attention_prefill_full(B, S, cfg)
+        op = ops.op_attention_prefill_swa(B, S, cfg)
         assert_op_valid(self, op)
         TP = cfg.rt.tp
         Nq = cfg.model.num_attention_heads // TP   # 8//2 = 4
-        kd = cfg.model.k_dim                       # 64
-        vd = cfg.model.v_dim                       # 64
-        flops_qk = B * Nq * S * S * kd * 2
-        flops_sv = B * Nq * S * S * vd * 2
+        kv_d = cfg.model.kv_dim                    # 64
+        W = cfg.model.window_size                  # 16
+        flops_qk = B * Nq * S * W * kv_d * 2
+        flops_sv = B * Nq * S * W * kv_d * 2
         self.assertEqual(op.flops, flops_qk + flops_sv)
 
-    def test_prefill_full_flash_attn_mem(self):
-        """Flash attention memory model: Q+K+V read, O write."""
+    def test_prefill_swa_flash_attn_mem(self):
+        """Flash attention memory model: Q + KV_window (shared) read, O write."""
         cfg = make_config()
         B, S = 2, 128
-        op = ops.op_attention_prefill_full(B, S, cfg)
+        op = ops.op_attention_prefill_swa(B, S, cfg)
         TP = cfg.rt.tp
         Nq = cfg.model.num_attention_heads // TP
         Dqc = cfg.model.head_dim
         Dr = cfg.model.rope_head_dim
-        kd = cfg.model.k_dim
-        vd = cfg.model.v_dim
+        kv_d = cfg.model.kv_dim
+        W = cfg.model.window_size
         q_bytes = bytes2(B * Nq * S * (Dqc + Dr))
-        k_bytes = bytes2(B * 1 * S * kd)
-        v_bytes = bytes2(B * 1 * S * vd)
+        kv_bytes = bytes2(B * W * kv_d)
         o_bytes = bytes2(B * Nq * S * Dqc)
-        expected_mem = q_bytes + k_bytes + v_bytes + o_bytes
+        expected_mem = q_bytes + kv_bytes + o_bytes
         self.assertEqual(op.mem_bytes, expected_mem)
 
     def test_prefill_compressed_with_index(self):
-        """C4A: use_index=True -> n_attend=topK."""
+        """C4A: use_index=True -> n_attend=topK. Compressed part only (no SWA)."""
         cfg = make_config()
         B, S, ratio = 2, 128, 4
         op = ops.op_attention_prefill_compressed(B, S, ratio, cfg, use_index=True)
@@ -295,21 +275,15 @@ class TestAttentionCompute(unittest.TestCase):
         TP = cfg.rt.tp
         Nq = cfg.model.num_attention_heads // TP
         topK = cfg.model.index_topk          # 16
-        c_k = cfg.model.compress_c_k         # 64
-        c_v = cfg.model.compress_c_v         # 64
-        kd = cfg.model.k_dim
-        vd = cfg.model.v_dim
-        W = cfg.model.window_size            # 16
-        # Compressed attention uses topK entries
-        flops_comp_qk = B * Nq * S * topK * c_k * 2
-        flops_comp_sv = B * Nq * S * topK * c_v * 2
-        flops_swa_qk = B * Nq * S * W * kd * 2
-        flops_swa_sv = B * Nq * S * W * vd * 2
-        expected_flops = flops_comp_qk + flops_comp_sv + flops_swa_qk + flops_swa_sv
+        c_kv = cfg.model.compress_c_kv       # 64
+        # Compressed attention only (SWA is a separate op now)
+        flops_comp_qk = B * Nq * S * topK * c_kv * 2
+        flops_comp_sv = B * Nq * S * topK * c_kv * 2
+        expected_flops = flops_comp_qk + flops_comp_sv
         self.assertEqual(op.flops, expected_flops)
 
     def test_prefill_compressed_without_index(self):
-        """C128A: use_index=False -> n_attend=S//ratio."""
+        """C128A: use_index=False -> n_attend=S//ratio. Compressed part only (no SWA)."""
         cfg = make_config()
         B, S, ratio = 2, 128, 128
         op = ops.op_attention_prefill_compressed(B, S, ratio, cfg, use_index=False)
@@ -317,45 +291,28 @@ class TestAttentionCompute(unittest.TestCase):
         TP = cfg.rt.tp
         Nq = cfg.model.num_attention_heads // TP
         S_comp = S // ratio                  # 1
-        c_k = cfg.model.compress_c_k
-        c_v = cfg.model.compress_c_v
-        kd = cfg.model.k_dim
-        vd = cfg.model.v_dim
-        W = cfg.model.window_size
-        flops_comp_qk = B * Nq * S * S_comp * c_k * 2
-        flops_comp_sv = B * Nq * S * S_comp * c_v * 2
-        flops_swa_qk = B * Nq * S * W * kd * 2
-        flops_swa_sv = B * Nq * S * W * vd * 2
-        expected_flops = flops_comp_qk + flops_comp_sv + flops_swa_qk + flops_swa_sv
+        c_kv = cfg.model.compress_c_kv
+        flops_comp_qk = B * Nq * S * S_comp * c_kv * 2
+        flops_comp_sv = B * Nq * S * S_comp * c_kv * 2
+        expected_flops = flops_comp_qk + flops_comp_sv
         self.assertEqual(op.flops, expected_flops)
 
-    def test_prefill_compressed_swa_window_contribution(self):
-        """SWA window contributes to flops in compressed attention."""
-        cfg = make_config(window_size=16)
-        B, S, ratio = 2, 128, 4
-        op_with_window = ops.op_attention_prefill_compressed(B, S, ratio, cfg, use_index=True)
-
-        cfg_no_window = make_config(window_size=0)
-        op_no_window = ops.op_attention_prefill_compressed(B, S, ratio, cfg_no_window, use_index=True)
-
-        self.assertGreater(op_with_window.flops, op_no_window.flops)
-
-    def test_decode_full(self):
-        """Decode full: S_query=1."""
+    def test_decode_swa(self):
+        """Decode SWA: S_query=1, attends to min(W, S_total). K=V shared."""
         cfg = make_config()
         B, S_total = 2, 128
-        op = ops.op_attention_decode_full(B, S_total, cfg)
+        op = ops.op_attention_decode_swa(B, S_total, cfg)
         assert_op_valid(self, op)
         TP = cfg.rt.tp
         Nq = cfg.model.num_attention_heads // TP
-        kd = cfg.model.k_dim
-        vd = cfg.model.v_dim
-        flops_qk = B * Nq * 1 * S_total * kd * 2
-        flops_sv = B * Nq * 1 * S_total * vd * 2
+        kv_d = cfg.model.kv_dim
+        W = min(cfg.model.window_size, S_total)
+        flops_qk = B * Nq * 1 * W * kv_d * 2
+        flops_sv = B * Nq * 1 * W * kv_d * 2
         self.assertEqual(op.flops, flops_qk + flops_sv)
 
     def test_decode_compressed_with_index(self):
-        """Decode compressed with index: n_attend=topK."""
+        """Decode compressed with index: n_attend=topK. Compressed part only (no SWA)."""
         cfg = make_config()
         B, S_total, ratio = 2, 128, 4
         op = ops.op_attention_decode_compressed(B, S_total, ratio, cfg, use_index=True)
@@ -363,20 +320,14 @@ class TestAttentionCompute(unittest.TestCase):
         TP = cfg.rt.tp
         Nq = cfg.model.num_attention_heads // TP
         topK = cfg.model.index_topk
-        c_k = cfg.model.compress_c_k
-        c_v = cfg.model.compress_c_v
-        kd = cfg.model.k_dim
-        vd = cfg.model.v_dim
-        W = cfg.model.window_size
-        flops_comp_qk = B * Nq * 1 * topK * c_k * 2
-        flops_comp_sv = B * Nq * 1 * topK * c_v * 2
-        flops_swa_qk = B * Nq * 1 * W * kd * 2
-        flops_swa_sv = B * Nq * 1 * W * vd * 2
-        expected_flops = flops_comp_qk + flops_comp_sv + flops_swa_qk + flops_swa_sv
+        c_kv = cfg.model.compress_c_kv
+        flops_comp_qk = B * Nq * 1 * topK * c_kv * 2
+        flops_comp_sv = B * Nq * 1 * topK * c_kv * 2
+        expected_flops = flops_comp_qk + flops_comp_sv
         self.assertEqual(op.flops, expected_flops)
 
     def test_decode_compressed_without_index(self):
-        """Decode compressed without index: n_attend=S_total//ratio."""
+        """Decode compressed without index: n_attend=S_total//ratio. Compressed part only."""
         cfg = make_config()
         B, S_total, ratio = 2, 128, 4
         op = ops.op_attention_decode_compressed(B, S_total, ratio, cfg, use_index=False)
@@ -384,16 +335,10 @@ class TestAttentionCompute(unittest.TestCase):
         TP = cfg.rt.tp
         Nq = cfg.model.num_attention_heads // TP
         S_comp = S_total // ratio             # 32
-        c_k = cfg.model.compress_c_k
-        c_v = cfg.model.compress_c_v
-        kd = cfg.model.k_dim
-        vd = cfg.model.v_dim
-        W = cfg.model.window_size
-        flops_comp_qk = B * Nq * 1 * S_comp * c_k * 2
-        flops_comp_sv = B * Nq * 1 * S_comp * c_v * 2
-        flops_swa_qk = B * Nq * 1 * W * kd * 2
-        flops_swa_sv = B * Nq * 1 * W * vd * 2
-        expected_flops = flops_comp_qk + flops_comp_sv + flops_swa_qk + flops_swa_sv
+        c_kv = cfg.model.compress_c_kv
+        flops_comp_qk = B * Nq * 1 * S_comp * c_kv * 2
+        flops_comp_sv = B * Nq * 1 * S_comp * c_kv * 2
+        expected_flops = flops_comp_qk + flops_comp_sv
         self.assertEqual(op.flops, expected_flops)
 
 
@@ -417,7 +362,7 @@ class TestMHCUnfused(unittest.TestCase):
         op = ops.op_mhc_pre(T, cfg)
         n = cfg.model.hc_mult
         D = cfg.model.hidden_size
-        expected_mem = 4 * (3 * T * n * D + T * (n**2 + 2*n) * n * D + T * (n**2 + 2*n))
+        expected_mem = bytes4(3 * T * n * D + T * (n**2 + 2*n) * n * D + T * (n**2 + 2*n))
         self.assertEqual(op.mem_bytes, expected_mem)
 
     def test_sinkhorn_no_cube(self):
@@ -441,7 +386,7 @@ class TestMHCUnfused(unittest.TestCase):
         T = 256
         op = ops.op_mhc_sinkhorn(T, cfg)
         n = cfg.model.hc_mult
-        expected_mem = 4 * (2 * T * n**2 + 20 * (2 * T * n**2 + 2 * T * n**2))
+        expected_mem = bytes4(2 * T * n**2 + 20 * (2 * T * n**2 + 2 * T * n**2))
         self.assertEqual(op.mem_bytes, expected_mem)
 
     def test_post_cube_formula(self):
@@ -720,7 +665,7 @@ class TestDecodeScoreOps(unittest.TestCase):
         B, S_total, ratio = 2, 128, 4
         op = ops.op_index_score_allreduce_decode(B, S_total, ratio, cfg)
         S_comp = S_total // ratio
-        expected_vol = B * S_comp * 4  # FP32
+        expected_vol = bytes2(B * S_comp)  # BF16
         self.assertEqual(op.comm_bytes, expected_vol)
         self.assertGreater(op.time_s, 0.0)
 

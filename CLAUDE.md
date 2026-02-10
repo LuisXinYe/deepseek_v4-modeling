@@ -73,6 +73,10 @@ All compression ops are now implemented with exact per-step costs:
 - `op_index_kv_compression_prefill()` — index key compression for Lightning Index (prefill)
 - `op_index_kv_compression_decode()` — index key compression per decode step (cost varies by `S_total % ratio`)
 
+## Future Work (TODO)
+- Overlap optimization: SWA and compressed attention currently modeled as separate ops.
+  Future analysis could model shared Q reads and overlapped execution.
+
 ## Parameter Search
 
 Grid search for optimal DeepSeek V4 deployment configurations across 4 independent scenarios.
@@ -109,7 +113,7 @@ See `_compression_period()` and `decode_model()` in `perf_model/layers.py`.
 
 ## Model Parameters
 
-- 43 layers: 2 full-attn (ratio=1), 21 C4A, 20 C128A
+- 43 layers: 2 SWA (ratio=1), 21 C4A, 20 C128A
 - MQA: 64 Q heads, 1 KV head
 - Lightning Index: 64 heads, dim=128, topK=512
 - MoE: 256 routed experts, top-6, 1 shared expert

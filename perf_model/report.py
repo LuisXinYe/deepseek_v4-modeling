@@ -118,12 +118,12 @@ def print_config_summary(cfg: Config):
     print(f"  Layers:              {cfg.model.num_hidden_layers}")
     print(f"  Q heads:             {cfg.model.num_attention_heads}, KV heads: {cfg.model.num_kv_heads} (MQA)")
     print(f"  Head dim:            {cfg.model.head_dim}, RoPE dim: {cfg.model.rope_head_dim}")
-    print(f"  K dim: {cfg.model.k_dim}, V dim: {cfg.model.v_dim}")
+    print(f"  KV dim (shared):     {cfg.model.kv_dim}")
     print(f"  Q LoRA rank:         {cfg.model.q_lora_rank}, O LoRA rank: {cfg.model.o_lora_rank}")
     print(f"  O groups:            {cfg.model.o_groups}, O mid dim: {cfg.model.o_mid_dim}")
     print(f"  Index heads:         {cfg.model.index_n_heads}, dim: {cfg.model.index_head_dim}, topK: {cfg.model.index_topk}")
     print(f"  SWA window:          {cfg.model.window_size}")
-    print(f"  Compress C_k:        {cfg.model.compress_c_k}, C_v: {cfg.model.compress_c_v}")
+    print(f"  Compress C_kv:       {cfg.model.compress_c_kv}")
     print(f"  HC mult:             {cfg.model.hc_mult}")
     print(f"  MoE: {cfg.model.n_routed_experts} routed experts, top-{cfg.model.num_experts_per_tok}, "
           f"{cfg.model.n_shared_experts} shared, inter={cfg.model.moe_inter_dim}")
@@ -135,7 +135,7 @@ def print_config_summary(cfg: Config):
     r1 = sum(1 for r in ratios if r == 1)
     r4 = sum(1 for r in ratios if r == 4)
     r128 = sum(1 for r in ratios if r == 128)
-    print(f"  Layer types:         {r1} full-attn (ratio=1), {r4} C4A, {r128} C128A")
+    print(f"  Layer types:         {r1} SWA (ratio=1), {r4} C4A, {r128} C128A")
     print()
 
     DP = cfg.rt.dp
@@ -191,7 +191,7 @@ def print_phase_report(phase: PhaseProfile, cfg: Config, detailed_step: Optional
             continue
         lp = detail_phase.layer_profiles[idx]
         ratio = lp.ratio
-        label = "Full Attention" if ratio == 1 else f"C{ratio}A"
+        label = "SWA" if ratio == 1 else f"C{ratio}A"
         print(f"  Layer {idx} ({label}, ratio={ratio}):")
         print_op_table(lp.ops, indent="    ")
         print(f"    {'TOTAL':<25s} | {fmt_ms(lp.total.cube_time_s):>9s} | {fmt_ms(lp.total.vec_time_s):>9s} | {fmt_ms(lp.total.mem_time_s):>9s} | {fmt_ms(lp.total.comm_time_s):>9s} | {fmt_ms(lp.total.time_s):>10s} | {lp.total.bottleneck:<5s}")
@@ -242,7 +242,7 @@ def print_memory_report(cfg: Config):
     for i in find_representative_layers(cfg):
         info = kv["layers"][i]
         print(f"    Layer {i} ({info['type']}): {fmt_bytes(info['bytes'])}", end="")
-        if info["type"] != "full":
+        if "comp_bytes" in info:
             parts = f"comp={fmt_bytes(info['comp_bytes'])}, swa={fmt_bytes(info['swa_bytes'])}"
             if "idx_bytes" in info:
                 parts += f", idx={fmt_bytes(info['idx_bytes'])}"
