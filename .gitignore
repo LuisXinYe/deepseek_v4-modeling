@@ -2,4 +2,4 @@ __pycache__/
 *.pyc
 output/
 **results/
-.claude/
+.claude/settings.local.json
