@@ -626,7 +626,7 @@ def compute_kv_cache_scaling(base_cfg, hw_name):
         # Compute hypothetical "no compression" KV cache
         # If all 43 layers used full attention: S * (k_dim + v_dim) * 2 * B * 43
         B = bs // dp
-        no_comp_kv_bytes = B * seq_len * (cfg.model.k_dim + cfg.model.v_dim) * 2 * cfg.model.num_hidden_layers
+        no_comp_kv_bytes = B * seq_len * (cfg.model.kv_dim * 2) * 2 * cfg.model.num_hidden_layers
         no_comp_kv_gb = no_comp_kv_bytes / 1e9
 
         # V3-style KV cache: (kv_lora_rank + rope_dim) * 2 * B * 61 layers
@@ -689,7 +689,7 @@ def compute_attention_analysis(base_cfg, hw_name):
 
         v4_kv_gb = kv["total_bytes"] / 1e9
         # Hypothetical uncompressed: all 43 layers as full attention
-        no_comp = B * seq_len * (cfg.model.k_dim + cfg.model.v_dim) * 2 * cfg.model.num_hidden_layers / 1e9
+        no_comp = B * seq_len * (cfg.model.kv_dim * 2) * 2 * cfg.model.num_hidden_layers / 1e9
         # V3 MLA style
         v3_kv = B * seq_len * (V3_PARAMS["kv_lora_rank"] + V3_PARAMS["qk_rope_head_dim"]) * 2 * V3_PARAMS["num_hidden_layers"] / 1e9
 

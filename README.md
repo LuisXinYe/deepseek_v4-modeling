@@ -113,10 +113,10 @@ The search evaluates 4 independent scenarios:
 
 | Scenario | Best Config | Key Metric | GPUs |
 |:---|:---|---:|---:|
-| Prefill Latency | TP=8, EP=64, DP=8, BS=8 | 330 ms | 64 |
-| Decode Latency | TP=4, EP=32, DP=8, BS=8 | 19.3 ms/step | 32 |
-| Prefill Throughput | TP=8, EP=16, DP=2, BS=256 | 1,656 tok/s/GPU | 16 |
-| Decode Throughput | TP=4, EP=16, DP=4, BS=512 | 181 tok/s/GPU | 16 |
+| Prefill Latency | TP=8, EP=64, DP=8, BS=8 | 325 ms | 64 |
+| Decode Latency | TP=4, EP=32, DP=8, BS=8 | 19.4 ms/step | 32 |
+| Prefill Throughput | TP=8, EP=16, DP=2, BS=512 | 1,679 tok/s/GPU | 16 |
+| Decode Throughput | TP=8, EP=16, DP=2, BS=512 | 307 tok/s/GPU | 16 |
 
 See [`param_search/report.md`](param_search/report.md) for detailed search analysis and [`report/report_en.md`](report/report_en.md) for the comprehensive 8-section analysis (V4 vs V3 comparison, bottleneck analysis, 4 serving combos: 8K/32K/128K/256K, mHC optimization, KV cache scaling, deployment recommendations).
 
