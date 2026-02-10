@@ -130,7 +130,7 @@ def op_index_kv_compression_decode(B: int, S_total: int, ratio: int, cfg: Config
     if S_total % g == 0:
         cube_flops = (8 * B * H * d + (8 * g - 2) * B * d)
         vec_ops    = (4 * g + 1) * B * d
-        mem_elems += int((B * H + 4 * H * d) + (4 * g * B * d) + B * d) # read 2 vector from this group, 2 vector from next group
+        mem_elems = int((B * H + 4 * H * d) + (4 * g * B * d) + B * d) # read 2 vector from this group, 2 vector from next group
     else:
         cube_flops = 8 * B * H * d
         vec_ops    = 0
@@ -227,7 +227,7 @@ def op_kv_compression_decode(B: int, S_total: int, ratio: int, cfg: Config) -> O
     if S_total % g == 0:
         cube_flops = coeff * (8 * B * H * c_kv + (8 * g - 2) * B * c_kv)
         vec_ops    = coeff * (4 * g + 1) * B * c_kv
-        mem_elems += int(B * H + coeff * (4 * H * c_kv + 4 * g * B * c_kv) + B * c_kv) # read 2 vector from this group, 2 vector from next group
+        mem_elems = int(B * H + coeff * (4 * H * c_kv + 4 * g * B * c_kv) + B * c_kv) # read 2 vector from this group, 2 vector from next group
     else:
         cube_flops = coeff * 8 * B * H * c_kv
         vec_ops    = 0
