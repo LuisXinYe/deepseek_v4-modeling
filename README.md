@@ -86,7 +86,7 @@ Create a new `configs/device_xxx.json` with fields matching `HardwareConfig`:
 
 `hbm_reserved_pct` reserves HBM headroom for runtime overhead. OOM checks and
 parameter searches use `hbm_capacity_gb * (1 - hbm_reserved_pct / 100)` as the
-usable memory limit.
+usable memory limit. The default shipped hardware configs reserve 10%.
 
 ### Adding new model configs
 Create a new `configs/model_xxx.json`. Key field: `compress_ratios` must be a list of length `num_layers` specifying the compression ratio per layer (1 = full attention).

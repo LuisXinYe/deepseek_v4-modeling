@@ -1,5 +1,7 @@
 # DeepSeek V4 Inference Performance Analysis: Ascend 910C vs NVIDIA H20
 
+> **Legacy note:** This narrative report predates the schema-v2 integer P/D sizing model, default `pd_tolerance=0.1`, and default `hbm_reserved_pct=10%`. For current P/D sizing results, use `report/data/pd_ratio_analysis.json` and `report/long_context_1m_1k_prefix_cache_report.md`.
+
 ## 1. Executive Summary
 
 This report presents a roofline-based performance analysis of DeepSeek V4 inference on Ascend 910C and NVIDIA H20 hardware, covering bottleneck profiling, parameter optimization, P/D disaggregation, and cross-platform comparison across four context-length scenarios (8K, 32K, 128K, 256K input with 4K output).

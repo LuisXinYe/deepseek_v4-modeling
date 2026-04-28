@@ -1,5 +1,7 @@
 # DeepSeek V4 Inference Performance Analysis — PPT Outline
 
+> **Legacy note:** This PPT outline predates schema-v2 integer P/D sizing and the current 10% HBM reserve / 0.1 P/D tolerance defaults. Treat its P/D ratio slides as historical; use `report/data/pd_ratio_analysis.json` for current values.
+
 ---
 
 ## Section 1: Executive Summary

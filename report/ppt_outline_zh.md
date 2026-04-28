@@ -1,5 +1,7 @@
 # DeepSeek V4 推理性能分析 — PPT 大纲
 
+> **历史报告说明：** 本 PPT 大纲早于 schema-v2 整数 P/D 配平模型，以及当前 10% HBM 预留 / 0.1 P/D tolerance 默认值。其 P/D 配比页面按历史口径理解；当前结果以 `report/data/pd_ratio_analysis.json` 为准。
+
 ---
 
 ## 第一部分：摘要

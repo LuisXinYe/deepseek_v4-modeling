@@ -11,7 +11,7 @@ class HardwareConfig:
     cube_tflops: float = 376
     vec_tflops: float = 24
     hbm_capacity_gb: float = 64
-    hbm_reserved_pct: float = 0.0
+    hbm_reserved_pct: float = 10.0
     hbm_bandwidth_gbps: float = 1800
     flops_utilization: float = 0.5
     hbm_bw_utilization: float = 0.8

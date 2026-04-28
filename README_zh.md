@@ -85,7 +85,7 @@ report/                   # 分析报告
 - `flops_utilization`、`hbm_bw_utilization`
 
 `hbm_reserved_pct` 用于为运行时开销预留 HBM 余量。OOM 判断和参数搜索会使用
-`hbm_capacity_gb * (1 - hbm_reserved_pct / 100)` 作为可用 HBM 上限。
+`hbm_capacity_gb * (1 - hbm_reserved_pct / 100)` 作为可用 HBM 上限。当前随仓库提供的硬件配置默认预留 10%。
 
 ### 添加新模型配置
 创建新的 `configs/model_xxx.json`。关键字段：`compress_ratios` 必须是长度为 `num_layers` 的列表，指定每层的压缩比（1 = 全注意力）。

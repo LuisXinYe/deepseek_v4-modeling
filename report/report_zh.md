@@ -1,5 +1,7 @@
 # DeepSeek V4 推理性能分析：Ascend 910C vs NVIDIA H20
 
+> **历史报告说明：** 本叙述报告早于 schema-v2 整数 P/D 配平模型、默认 `pd_tolerance=0.1` 和默认 `hbm_reserved_pct=10%`。当前 P/D sizing 结果以 `report/data/pd_ratio_analysis.json` 和 `report/long_context_1m_1k_prefix_cache_report.md` 为准。
+
 ## 1. 摘要
 
 本报告基于 Roofline 模型，对 DeepSeek V4 在 Ascend 910C 和 NVIDIA H20 硬件平台上的推理性能进行了全面分析，涵盖瓶颈分析、参数优化、P/D 分离部署和跨平台对比，覆盖四种上下文长度场景（8K、32K、128K、256K 输入 + 4K 输出）。

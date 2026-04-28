@@ -141,13 +141,48 @@ class TestSearchAnalyze(unittest.TestCase):
 
 
 class TestScenarioAnalysis(unittest.TestCase):
-    def test_compute_pd_ratio_uses_instance_qps(self):
-        ratio, rounded = analyze_scenarios.compute_pd_ratio(
+    def test_compute_pd_ratio_returns_minimal_integer_balance(self):
+        ratio = analyze_scenarios.compute_pd_ratio(
             p_qps_instance=100.0,
             d_qps_instance=250.0,
+            tolerance=0.0,
         )
-        self.assertEqual(ratio, 2.5)
-        self.assertEqual(rounded, 3)
+        self.assertEqual(ratio["prefill_instances"], 5)
+        self.assertEqual(ratio["decode_instances"], 2)
+        self.assertEqual(ratio["label"], "5P:2D")
+        self.assertEqual(ratio["qps_imbalance_pct"], 0.0)
+
+    def test_compute_pd_ratio_allows_more_decode_instances(self):
+        ratio = analyze_scenarios.compute_pd_ratio(
+            p_qps_instance=10.0,
+            d_qps_instance=1.0,
+            tolerance=0.0,
+        )
+        self.assertEqual(ratio["prefill_instances"], 1)
+        self.assertEqual(ratio["decode_instances"], 10)
+        self.assertEqual(ratio["label"], "1P:10D")
+
+    def test_compute_pd_ratio_honors_tolerance_for_small_integer_pair(self):
+        ratio = analyze_scenarios.compute_pd_ratio(
+            p_qps_instance=0.8167422737314898,
+            d_qps_instance=1.2535464474056521,
+            tolerance=0.02,
+        )
+        self.assertEqual(ratio["prefill_instances"], 14)
+        self.assertEqual(ratio["decode_instances"], 9)
+        self.assertEqual(ratio["label"], "14P:9D")
+        self.assertLessEqual(ratio["qps_imbalance_pct"], 0.02)
+
+    def test_compute_pd_ratio_uses_lowest_integer_inside_tolerance_band(self):
+        ratio = analyze_scenarios.compute_pd_ratio(
+            p_qps_instance=1.0,
+            d_qps_instance=60.01,
+            tolerance=0.02,
+        )
+        self.assertEqual(ratio["prefill_instances"], 59)
+        self.assertEqual(ratio["decode_instances"], 1)
+        self.assertEqual(ratio["label"], "59P:1D")
+        self.assertLessEqual(ratio["qps_imbalance_pct"], 0.02)
 
     def test_combos_include_1m_4k(self):
         names = {combo["name"] for combo in analyze_scenarios.COMBOS}
@@ -155,6 +190,9 @@ class TestScenarioAnalysis(unittest.TestCase):
 
     def test_hit_rate_values_are_defined(self):
         self.assertEqual(analyze_scenarios.PREFIX_CACHE_HIT_RATE_VALUES, [0.0, 0.9, 0.99])
+
+    def test_default_pd_ratio_tolerance_is_ten_percent(self):
+        self.assertEqual(analyze_scenarios.PD_RATIO_TOLERANCE, 0.1)
 
     def test_report_gpu_values_are_power_of_two_request_set(self):
         self.assertEqual(analyze_scenarios.PREFILL_GPU_VALUES, [8, 16, 32, 64])

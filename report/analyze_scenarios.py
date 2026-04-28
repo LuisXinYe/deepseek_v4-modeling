@@ -46,6 +46,9 @@ EP_VALUES = [1, 2, 4, 8, 16, 32, 64, 128, 256]
 DP_VALUES = [1, 2, 4, 8]
 BATCH_VALUES = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
 
+PD_RATIO_TOLERANCE = 0.1
+PD_RATIO_MAX_INSTANCES = 10_000
+
 HARDWARE_CONFIGS = {
     "910C": {
         "device": os.path.join(BASE_DIR, "configs", "device_910C.json"),
@@ -284,15 +287,102 @@ def sort_results(results, phase, scenario):
 # P/D Ratio Calculator
 # ---------------------------------------------------------------------------
 
-def compute_pd_ratio(p_qps_instance, d_qps_instance):
-    """Compute minimum P:D instance ratio for QPS balance.
+def compute_pd_ratio(p_qps_instance, d_qps_instance,
+                     tolerance=PD_RATIO_TOLERANCE,
+                     max_instances=PD_RATIO_MAX_INSTANCES):
+    """Find the smallest integer P:D ratio that balances aggregate QPS.
 
-    Returns (ratio_float, n_p_per_d_ceil).
+    Solves N * prefill_qps ~= M * decode_qps with integer N and M. The
+    returned pair is the smallest deployment unit within the requested
+    relative imbalance tolerance.
     """
-    if p_qps_instance == 0:
-        return float('inf'), 999
-    ratio = d_qps_instance / p_qps_instance
-    return ratio, math.ceil(ratio)
+    if p_qps_instance <= 0:
+        raise ValueError("p_qps_instance must be positive")
+    if d_qps_instance <= 0:
+        raise ValueError("d_qps_instance must be positive")
+    if tolerance < 0 or tolerance >= 1:
+        raise ValueError("tolerance must be in [0, 1)")
+    if max_instances < 1:
+        raise ValueError("max_instances must be positive")
+
+    ratio_float = d_qps_instance / p_qps_instance
+    best = None
+    best_score = None
+    nearest = None
+    nearest_score = None
+
+    for decode_instances in range(1, max_instances + 1):
+        desired_prefill = ratio_float * decode_instances
+        min_prefill = desired_prefill * (1 - tolerance)
+        max_prefill = desired_prefill / (1 - tolerance)
+        candidates = {
+            math.ceil(min_prefill),
+            math.floor(max_prefill),
+            math.floor(desired_prefill),
+            round(desired_prefill),
+            math.ceil(desired_prefill),
+        }
+
+        for prefill_instances in candidates:
+            if prefill_instances < 1 or prefill_instances > max_instances:
+                continue
+
+            prefill_aggregate_qps = prefill_instances * p_qps_instance
+            decode_aggregate_qps = decode_instances * d_qps_instance
+            qps_imbalance = prefill_aggregate_qps - decode_aggregate_qps
+            qps_imbalance_pct = (
+                abs(qps_imbalance)
+                / max(prefill_aggregate_qps, decode_aggregate_qps)
+            )
+            ratio_actual = prefill_instances / decode_instances
+
+            result = {
+                "pd_ratio_float": ratio_float,
+                "pd_ratio_actual": ratio_actual,
+                "prefill_instances": prefill_instances,
+                "decode_instances": decode_instances,
+                "prefill_aggregate_qps": prefill_aggregate_qps,
+                "decode_aggregate_qps": decode_aggregate_qps,
+                "qps_imbalance": qps_imbalance,
+                "qps_imbalance_pct": qps_imbalance_pct,
+                "balance_tolerance": tolerance,
+                "label": f"{prefill_instances}P:{decode_instances}D",
+            }
+            score = (
+                prefill_instances + decode_instances,
+                qps_imbalance_pct,
+                0 if qps_imbalance >= 0 else 1,
+                abs(ratio_actual - ratio_float),
+                prefill_instances,
+                decode_instances,
+            )
+            nearest_candidate_score = (
+                qps_imbalance_pct,
+                prefill_instances + decode_instances,
+                prefill_instances,
+                decode_instances,
+            )
+
+            if nearest_score is None or nearest_candidate_score < nearest_score:
+                nearest = result
+                nearest_score = nearest_candidate_score
+            if qps_imbalance_pct <= tolerance + 1e-12:
+                if best_score is None or score < best_score:
+                    best = result
+                    best_score = score
+
+    if best is None:
+        detail = ""
+        if nearest is not None:
+            detail = (
+                f"; nearest={nearest['label']} "
+                f"imbalance={nearest['qps_imbalance_pct']:.6f}"
+            )
+        raise ValueError(
+            f"No P/D ratio found within tolerance={tolerance} "
+            f"and max_instances={max_instances}{detail}"
+        )
+    return best
 
 
 # ---------------------------------------------------------------------------
@@ -941,9 +1031,13 @@ def main():
                 p_qps = p_best["prefill_qps_instance"]
                 d_qps = d_best["decode_qps_instance"]
 
-                ratio_float, n_p_ceil = compute_pd_ratio(p_qps, d_qps)
+                pd_ratio = compute_pd_ratio(p_qps, d_qps)
+                n_p = pd_ratio["prefill_instances"]
+                n_d = pd_ratio["decode_instances"]
+                total_gpus_min = n_p * g_p + n_d * g_d
 
                 pd_info = {
+                    "schema_version": 2,
                     "prefill_config": {
                         "tp": p_best["tp"], "ep": p_best["ep"], "dp": p_best["dp"],
                         "batch_size": p_best["batch_size"],
@@ -961,15 +1055,23 @@ def main():
                     "input_len": seq_len,
                     "output_len": output_len,
                     "prefix_cache_hit_rate": p_best.get("prefix_cache_hit_rate", 0.0),
-                    "pd_ratio_float": round(ratio_float, 3),
-                    "pd_ratio_ceil": n_p_ceil,
-                    "total_gpus_min": n_p_ceil * g_p + 1 * g_d,
-                    "label": f"{n_p_ceil}P:1D",
+                    "pd_ratio_float": round(pd_ratio["pd_ratio_float"], 3),
+                    "pd_ratio_actual": round(pd_ratio["pd_ratio_actual"], 3),
+                    "prefill_instances": n_p,
+                    "decode_instances": n_d,
+                    "prefill_aggregate_qps": round(pd_ratio["prefill_aggregate_qps"], 4),
+                    "decode_aggregate_qps": round(pd_ratio["decode_aggregate_qps"], 4),
+                    "qps_imbalance": round(pd_ratio["qps_imbalance"], 6),
+                    "qps_imbalance_pct": round(pd_ratio["qps_imbalance_pct"], 6),
+                    "balance_tolerance": pd_ratio["balance_tolerance"],
+                    "total_gpus_min": total_gpus_min,
+                    "label": pd_ratio["label"],
                 }
                 hw_pd[combo_name] = pd_info
                 print(f"\n  P/D Ratio ({combo_name}): {pd_info['label']} "
-                      f"({n_p_ceil}×{g_p}GPU P + 1×{g_d}GPU D = "
-                      f"{pd_info['total_gpus_min']} GPUs)")
+                      f"({n_p}×{g_p}GPU P + {n_d}×{g_d}GPU D = "
+                      f"{pd_info['total_gpus_min']} GPUs, "
+                      f"imbalance={pd_info['qps_imbalance_pct']*100:.2f}%)")
             else:
                 hw_pd[combo_name] = {"error": "No valid configs for P/D calculation"}
                 print(f"\n  P/D Ratio ({combo_name}): SKIPPED (no valid configs)")

@@ -422,27 +422,27 @@
         }
       },
       "1000000": {
-        "batch_size": 16,
+        "batch_size": 8,
         "layers": {
           "full": {
             "layer_idx": 0,
             "ratio": 1,
-            "attn_time_ms": 3627.506,
-            "layer_total_ms": 9048.631,
+            "attn_time_ms": 1813.753,
+            "layer_total_ms": 4524.408,
             "attn_pct": 40.1
           },
           "C4A": {
             "layer_idx": 2,
             "ratio": 4,
-            "attn_time_ms": 4534.383,
-            "layer_total_ms": 87245.803,
+            "attn_time_ms": 2267.191,
+            "layer_total_ms": 43623.029,
             "attn_pct": 5.2
           },
           "C128A": {
             "layer_idx": 3,
             "ratio": 128,
-            "attn_time_ms": 17464.458,
-            "layer_total_ms": 24304.781,
+            "attn_time_ms": 8732.229,
+            "layer_total_ms": 12152.483,
             "attn_pct": 71.9
           }
         }
