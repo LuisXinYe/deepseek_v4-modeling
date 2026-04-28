@@ -471,6 +471,10 @@ def _hit_label(hit_rate: float) -> str:
     return f"h={hit_rate:g}"
 
 
+def _scenario_short_label(label: str) -> str:
+    return label.split(" + ")[0]
+
+
 def _table(headers: list[str], rows: list[list[Any]]) -> str:
     lines = [
         "| " + " | ".join(headers) + " |",
@@ -486,6 +490,22 @@ def _svg_text(x: float, y: float, text: str, *, size: int = 12, anchor: str = "m
         f'<text x="{x:.1f}" y="{y:.1f}" font-size="{size}" font-weight="{weight}" '
         f'text-anchor="{anchor}" fill="#1f2937">{html.escape(text)}</text>'
     )
+
+
+def _svg_multiline_text(
+    x: float,
+    y: float,
+    text: str,
+    *,
+    size: int = 12,
+    anchor: str = "middle",
+    line_height: int = 14,
+) -> list[str]:
+    lines = str(text).split("\n")
+    return [
+        _svg_text(x, y + idx * line_height, line, size=size, anchor=anchor)
+        for idx, line in enumerate(lines)
+    ]
 
 
 def write_bar_chart_svg(
@@ -508,7 +528,7 @@ def write_bar_chart_svg(
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
         '<rect width="100%" height="100%" fill="#ffffff"/>',
         _svg_text(width / 2, 30, title, size=18, weight="700"),
-        _svg_text(20, top + chart_h / 2, ylabel, size=13, anchor="middle"),
+        _svg_text(left, top - 14, ylabel, size=12, anchor="start"),
         f'<line x1="{left}" y1="{top}" x2="{left}" y2="{top + chart_h}" stroke="#374151"/>',
         f'<line x1="{left}" y1="{top + chart_h}" x2="{left + chart_w}" y2="{top + chart_h}" stroke="#374151"/>',
     ]
@@ -524,7 +544,7 @@ def write_bar_chart_svg(
         out.append(f'<rect x="{x - bar_w / 2:.1f}" y="{y:.1f}" width="{bar_w:.1f}" height="{h:.1f}" fill="#2563eb"/>')
         label = value_labels[i] if value_labels else _nice(value, 2)
         out.append(_svg_text(x, y - 8, label, size=11))
-        out.append(_svg_text(x, top + chart_h + 24, labels[i], size=12))
+        out.extend(_svg_multiline_text(x, top + chart_h + 22, labels[i], size=10, line_height=14))
     out.append("</svg>")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(out) + "\n")
@@ -537,8 +557,8 @@ def write_line_chart_svg(
     series: list[dict[str, Any]],
     ylabel: str,
 ) -> None:
-    width, height = 980, 500
-    left, right, top, bottom = 90, 150, 62, 104
+    width, height = 980, 540
+    left, right, top, bottom = 90, 150, 84, 84
     chart_w = width - left - right
     chart_h = height - top - bottom
     values = [value for item in series for value in item["values"] if value is not None]
@@ -549,7 +569,8 @@ def write_line_chart_svg(
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
         '<rect width="100%" height="100%" fill="#ffffff"/>',
         _svg_text(width / 2, 30, title, size=18, weight="700"),
-        _svg_text(24, top + chart_h / 2, ylabel, size=13),
+        _svg_text(left, 56, "Point label = HBM / TPOT max B/card", size=11, anchor="start"),
+        _svg_text(left, top - 12, ylabel, size=12, anchor="start"),
         f'<line x1="{left}" y1="{top}" x2="{left}" y2="{top + chart_h}" stroke="#374151"/>',
         f'<line x1="{left}" y1="{top + chart_h}" x2="{left + chart_w}" y2="{top + chart_h}" stroke="#374151"/>',
     ]
@@ -580,7 +601,8 @@ def write_line_chart_svg(
         for x, y, _, label in points:
             out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4.5" fill="{color}"/>')
             if label:
-                out.append(_svg_text(x, y - 12, label, size=10))
+                label_y = y + 18 if s_idx == 0 else y - 12
+                out.append(_svg_text(x, label_y, label, size=10))
         legend_y = top + 12 + s_idx * 24
         out.append(f'<rect x="{left + chart_w + 28}" y="{legend_y - 10}" width="14" height="14" fill="{color}"/>')
         out.append(_svg_text(left + chart_w + 50, legend_y + 2, item["name"], size=12, anchor="start"))
@@ -590,7 +612,7 @@ def write_line_chart_svg(
 
 
 def write_stacked_pd_svg(path: Path, rows: list[dict[str, Any]]) -> None:
-    width, height = 1080, 520
+    width, height = 1600, 520
     left, right, top, bottom = 90, 60, 62, 112
     chart_w = width - left - right
     chart_h = height - top - bottom
@@ -639,7 +661,10 @@ def generate_figures(
     decode_rows: list[dict[str, Any]],
     pd_rows: list[dict[str, Any]],
 ) -> None:
-    labels = [f"{row['scenario_label']} {_hit_label(row['prefix_cache_hit_rate'])}" for row in prefill_rows]
+    labels = [
+        f"{_scenario_short_label(row['scenario_label'])}\n{_hit_label(row['prefix_cache_hit_rate'])}"
+        for row in prefill_rows
+    ]
     write_bar_chart_svg(
         FIGURE_DIR / "prefill_hbm.svg",
         "Prefill HBM Occupancy by Prefix Cache Hit Rate",
@@ -668,7 +693,7 @@ def generate_figures(
                 values.append(row["decode_tps_per_card"] if row.get("is_tpot_feasible") else None)
                 hbm_b = row.get("max_batch_per_card_hbm")
                 tpot_b = row.get("max_batch_per_card_tpot")
-                point_labels.append(f"H{_nice(hbm_b, 0)}/T{_nice(tpot_b, 0)}")
+                point_labels.append(f"{_nice(hbm_b, 0)}/{_nice(tpot_b, 0)}")
             series.append({"name": mode["label"], "values": values, "point_labels": point_labels})
         write_line_chart_svg(
             FIGURE_DIR / f"decode_{scenario['scenario_id']}.svg",
@@ -880,8 +905,6 @@ def generate_all() -> dict[str, Any]:
     write_json(DATA_DIR / "decode_results.json", decode_results)
     write_json(DATA_DIR / "pd_ratio_results.json", pd_rows)
     write_json(DATA_DIR / "manifest.json", manifest)
-    (REPORT_ROOT / "report.md").write_text(render_report(base_cfg, prefill_rows, decode_results, pd_rows))
-
     return {
         "prefill_rows": prefill_rows,
         "decode_results": decode_results,
@@ -892,7 +915,7 @@ def generate_all() -> dict[str, Any]:
 
 def main() -> None:
     generate_all()
-    print(f"Wrote report artifacts under {REPORT_ROOT}")
+    print(f"Wrote report data and figures under {REPORT_ROOT}")
 
 
 if __name__ == "__main__":
