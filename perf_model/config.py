@@ -1,6 +1,7 @@
 """Config dataclasses and JSON loader."""
 
 import json
+import math
 from dataclasses import dataclass, field, fields as dataclass_fields
 from typing import List
 
@@ -93,6 +94,21 @@ class RuntimeConfig:
     mhc_sp: bool = False
     mhc_kernel_fused: bool = True    # Fuse mHC pre+sinkhorn+post into single kernels (FP32)
     mhc_fused_bf16: bool = False     # Use BF16 activations in fused mHC (inference only)
+    input_len: int | None = None
+    decode_context_len: int | None = None
+    prefix_cache_hit_rate: float = 0.0
+
+    @property
+    def request_input_len(self) -> int:
+        return self.input_len if self.input_len is not None else self.seq_len
+
+    @property
+    def effective_prefill_len(self) -> int:
+        return math.ceil(self.request_input_len * (1 - self.prefix_cache_hit_rate))
+
+    @property
+    def decode_context_len_effective(self) -> int:
+        return self.decode_context_len if self.decode_context_len is not None else self.request_input_len
 
 
 @dataclass

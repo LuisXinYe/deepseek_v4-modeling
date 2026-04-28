@@ -99,6 +99,9 @@ def make_config(**overrides) -> Config:
         mhc_sp=False,
         mhc_kernel_fused=True,
         mhc_fused_bf16=False,
+        input_len=None,
+        decode_context_len=None,
+        prefix_cache_hit_rate=0.0,
     )
     rt_defaults.update(rt_overrides)
 

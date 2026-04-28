@@ -106,6 +106,30 @@ class TestRuntimeConfig(unittest.TestCase):
         self.assertEqual(rt.tp, 4)
         self.assertEqual(rt.ep, 64)
         self.assertEqual(rt.dp, 1)
+        self.assertIsNone(rt.input_len)
+        self.assertIsNone(rt.decode_context_len)
+        self.assertEqual(rt.prefix_cache_hit_rate, 0.0)
+
+    def test_helper_semantics(self):
+        rt = RuntimeConfig(
+            seq_len=4096,
+            input_len=3000,
+            decode_context_len=None,
+            prefix_cache_hit_rate=0.25,
+        )
+        self.assertEqual(rt.request_input_len, 3000)
+        self.assertEqual(rt.effective_prefill_len, 2250)
+        self.assertEqual(rt.decode_context_len_effective, 3000)
+
+        rt = RuntimeConfig(
+            seq_len=4096,
+            input_len=None,
+            decode_context_len=512,
+            prefix_cache_hit_rate=0.1,
+        )
+        self.assertEqual(rt.request_input_len, 4096)
+        self.assertEqual(rt.effective_prefill_len, 3687)
+        self.assertEqual(rt.decode_context_len_effective, 512)
 
 
 class TestConfigFromJson(unittest.TestCase):
@@ -183,7 +207,9 @@ class TestConfigFromJson(unittest.TestCase):
                            "ep": 4, "sp": True, "moe_load_balance_factor": 1.0,
                            "output_len": 8, "shared_expert_overlapped": False,
                            "mhc_sp": True, "mhc_kernel_fused": False,
-                           "mhc_fused_bf16": False}, f)
+                           "mhc_fused_bf16": False,
+                           "input_len": 48, "decode_context_len": 32,
+                           "prefix_cache_hit_rate": 0.25}, f)
 
             cfg = Config.from_json(hw_path, net_path, model_path, rt_path)
 
@@ -192,6 +218,12 @@ class TestConfigFromJson(unittest.TestCase):
             self.assertEqual(cfg.model.hidden_size, 512)
             self.assertFalse(hasattr(cfg.model, "extra_field"))
             self.assertEqual(cfg.rt.seq_len, 64)
+            self.assertEqual(cfg.rt.input_len, 48)
+            self.assertEqual(cfg.rt.decode_context_len, 32)
+            self.assertEqual(cfg.rt.prefix_cache_hit_rate, 0.25)
+            self.assertEqual(cfg.rt.request_input_len, 48)
+            self.assertEqual(cfg.rt.effective_prefill_len, 36)
+            self.assertEqual(cfg.rt.decode_context_len_effective, 32)
             self.assertFalse(cfg.rt.shared_expert_overlapped)
             self.assertTrue(cfg.rt.mhc_sp)
             self.assertFalse(cfg.rt.mhc_kernel_fused)
@@ -214,10 +246,13 @@ class TestMakeConfig(unittest.TestCase):
         self.assertEqual(cfg.model.compress_ratios, [1, 4, 128, 4])
 
     def test_overrides(self):
-        cfg = make_config(tp=8, batch_size=16, hidden_size=512)
+        cfg = make_config(tp=8, batch_size=16, hidden_size=512,
+                          input_len=96, prefix_cache_hit_rate=0.5)
         self.assertEqual(cfg.rt.tp, 8)
         self.assertEqual(cfg.rt.batch_size, 16)
         self.assertEqual(cfg.model.hidden_size, 512)
+        self.assertEqual(cfg.rt.input_len, 96)
+        self.assertEqual(cfg.rt.request_input_len, 96)
 
     def test_unknown_override_raises(self):
         with self.assertRaises(ValueError):
