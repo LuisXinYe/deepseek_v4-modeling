@@ -47,6 +47,7 @@ class TestQuantization(unittest.TestCase):
         q_w8 = quantize_op_profile(op, w8)
         self.assertLess(q_w8.cube_time_s, q_bf16.cube_time_s)
         self.assertLess(q_w8.mem_bytes, q_bf16.mem_bytes)
+        self.assertLess(q_w8.mem_time_s, q_bf16.mem_time_s)
 
         comm = OpProfile(name="attn_tp_allreduce", comm_time_s=0.01, time_s=0.01, bottleneck="COMM")
         self.assertEqual(quantize_op_profile(comm, w8).time_s, comm.time_s)
