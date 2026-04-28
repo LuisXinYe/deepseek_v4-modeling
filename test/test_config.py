@@ -131,6 +131,36 @@ class TestRuntimeConfig(unittest.TestCase):
         self.assertEqual(rt.quant_mode, "bf16")
         self.assertEqual(rt.kv_cache_quant_mode, "bf16")
 
+    def test_validate_serving_fields_accepts_defaults(self):
+        RuntimeConfig().validate_serving_fields()
+
+    def test_validate_serving_fields_rejects_negative_mtp(self):
+        with self.assertRaisesRegex(ValueError, "mtp must be >= 0"):
+            RuntimeConfig(mtp=-1).validate_serving_fields()
+
+    def test_validate_serving_fields_rejects_invalid_mtp_accept_ratio(self):
+        with self.assertRaisesRegex(ValueError, r"mtp_accept_ratio must be in \[0, 1\]"):
+            RuntimeConfig(mtp_accept_ratio=1.1).validate_serving_fields()
+
+    def test_validate_serving_fields_rejects_invalid_quant_mode(self):
+        with self.assertRaisesRegex(ValueError, "quant_mode must be 'bf16' or 'w8a8'"):
+            RuntimeConfig(quant_mode="fp8").validate_serving_fields()
+
+    def test_validate_serving_fields_rejects_invalid_kv_cache_quant_mode(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "kv_cache_quant_mode must be 'bf16', 'kv8', or 'kv4'",
+        ):
+            RuntimeConfig(kv_cache_quant_mode="kv2").validate_serving_fields()
+
+    def test_validate_serving_fields_rejects_negative_weight_scale_overhead_bytes(self):
+        with self.assertRaisesRegex(ValueError, "weight_scale_overhead_bytes must be >= 0"):
+            RuntimeConfig(weight_scale_overhead_bytes=-1).validate_serving_fields()
+
+    def test_validate_serving_fields_rejects_negative_kv_scale_overhead_bytes(self):
+        with self.assertRaisesRegex(ValueError, "kv_scale_overhead_bytes must be >= 0"):
+            RuntimeConfig(kv_scale_overhead_bytes=-1).validate_serving_fields()
+
     def test_helper_semantics(self):
         rt = RuntimeConfig(
             seq_len=4096,

@@ -141,6 +141,10 @@ class RuntimeConfig:
             raise ValueError("quant_mode must be 'bf16' or 'w8a8'")
         if self.kv_cache_quant_mode not in {"bf16", "kv8", "kv4"}:
             raise ValueError("kv_cache_quant_mode must be 'bf16', 'kv8', or 'kv4'")
+        if self.weight_scale_overhead_bytes < 0:
+            raise ValueError("weight_scale_overhead_bytes must be >= 0")
+        if self.kv_scale_overhead_bytes < 0:
+            raise ValueError("kv_scale_overhead_bytes must be >= 0")
 
 
 @dataclass
