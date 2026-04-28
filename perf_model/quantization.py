@@ -130,6 +130,9 @@ def _with_roofline_timings(
 def quantize_op_profile(op: OpProfile, cfg: Config) -> OpProfile:
     """Return a quantization-adjusted copy of an op profile."""
     cfg.rt.validate_serving_fields()
+    if op.flops == op.vec_ops == op.mem_bytes == op.comm_time_s == 0 and op.time_s > 0:
+        return replace(op)
+
     kind = infer_op_kind(op.name)
     if kind == "comm":
         return replace(op)
@@ -140,6 +143,8 @@ def quantize_op_profile(op: OpProfile, cfg: Config) -> OpProfile:
         cube_tflops = cfg.hw.effective_w8a8_tflops
         mem_bytes = op.mem_bytes * WEIGHT_BYTE_RATIOS[cfg.rt.quant_mode]
     elif kind == "attention":
+        # Current attention profiles expose only aggregate memory, so the 0428
+        # spec scales the full mem_bytes field by the KV cache byte ratio.
         mem_bytes = op.mem_bytes * KV_BYTE_RATIOS[cfg.rt.kv_cache_quant_mode]
 
     return _with_roofline_timings(op, cfg, cube_tflops, mem_bytes, op.comm_time_s)
@@ -149,7 +154,8 @@ def quantize_phase_profile(phase: PhaseProfile, cfg: Config) -> PhaseProfile:
     """Return a quantized copy of a phase profile with recomputed totals."""
     cfg.rt.validate_serving_fields()
     layer_profiles = []
-    total_time_s = 0.0
+    original_detailed_total = 0.0
+    quantized_detailed_total = 0.0
 
     for layer in phase.layer_profiles:
         ops = [quantize_op_profile(op, cfg) for op in layer.ops]
@@ -162,10 +168,20 @@ def quantize_phase_profile(phase: PhaseProfile, cfg: Config) -> PhaseProfile:
                 total=total,
             )
         )
-        total_time_s += total.time_s
+        if layer.total is not None:
+            original_detailed_total += layer.total.time_s
+        else:
+            original_detailed_total += sum(op.time_s for op in layer.ops)
+        quantized_detailed_total += total.time_s
 
     extra_ops = [quantize_op_profile(op, cfg) for op in phase.extra_ops]
-    total_time_s += sum(op.time_s for op in extra_ops)
+    original_detailed_total += sum(op.time_s for op in phase.extra_ops)
+    quantized_detailed_total += sum(op.time_s for op in extra_ops)
+
+    if original_detailed_total > 0 and phase.total_time_s != original_detailed_total:
+        total_time_s = phase.total_time_s * quantized_detailed_total / original_detailed_total
+    else:
+        total_time_s = quantized_detailed_total
 
     return PhaseProfile(
         phase=phase.phase,

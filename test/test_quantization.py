@@ -1,7 +1,7 @@
 import unittest
 
 from test.helpers import make_config
-from perf_model.layers import LayerProfile, PhaseProfile
+from perf_model.layers import LayerProfile, PhaseProfile, decode_model
 from perf_model.roofline import OpProfile, sum_ops
 from perf_model.quantization import (
     infer_op_kind,
@@ -119,6 +119,27 @@ class TestQuantization(unittest.TestCase):
         self.assertAlmostEqual(q_phase.total_time_s, expected_total)
         self.assertEqual(q_phase.phase, "prefill")
         self.assertEqual(q_phase.total_tokens, 2)
+
+    def test_bf16_decode_total_time_is_preserved_for_aggregate_phase(self):
+        cfg = make_config(quant_mode="bf16", kv_cache_quant_mode="bf16", output_len=300)
+        phase = decode_model(cfg)
+
+        q_phase = quantize_phase_profile(phase, cfg)
+
+        self.assertEqual(phase.phase, "decode_total")
+        self.assertNotAlmostEqual(
+            phase.total_time_s,
+            sum(lp.total.time_s for lp in phase.layer_profiles) + sum(op.time_s for op in phase.extra_ops),
+        )
+        self.assertAlmostEqual(q_phase.total_time_s, phase.total_time_s)
+
+    def test_manually_timed_op_is_preserved(self):
+        cfg = make_config(quant_mode="w8a8", kv_cache_quant_mode="kv8")
+        op = OpProfile(name="shared_expert_excess", time_s=0.123)
+
+        q_op = quantize_op_profile(op, cfg)
+
+        self.assertEqual(q_op, op)
 
 
 if __name__ == "__main__":
