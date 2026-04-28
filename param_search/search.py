@@ -33,9 +33,10 @@ from perf_model.memory import kv_cache_memory, weight_memory_per_rank
 
 TP_VALUES = [1, 2, 4, 8, 16, 32, 64]
 EP_VALUES = [1, 2, 4, 8, 16, 32, 64, 128, 256]
-SEQ_VALUES = [1024, 2048, 4096, 8192, 16384, 32768]
+SEQ_VALUES = [1024, 2048, 4096, 8192, 16384, 32768, 1_000_000]
 DP_VALUES = [1, 2, 4, 8]
 BATCH_VALUES = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+PREFIX_CACHE_HIT_RATE_VALUES = [0.0, 0.9, 0.99]
 
 MIN_GPUS = 8
 MAX_GPUS = 64
@@ -43,12 +44,16 @@ HBM_LIMIT_GB = 64
 
 
 CSV_COLUMNS = [
-    "tp", "ep", "dp", "edp", "batch_size", "seq_len", "sp", "shared_expert_overlapped",
+    "tp", "ep", "dp", "edp", "batch_size", "seq_len",
+    "logical_input_len", "effective_prefill_len", "decode_context_len", "prefix_cache_hit_rate",
+    "sp", "shared_expert_overlapped",
     "physical_gpus", "per_rank_batch", "weight_gb", "kv_cache_gb", "hbm_total_gb",
     # prefill phase columns
-    "prefill_time_ms", "prefill_tps", "prefill_tps_per_gpu",
+    "prefill_time_ms", "prefill_tps", "prefill_tps_instance",
+    "prefill_tps_per_gpu", "prefill_qps_instance",
     # decode phase columns
-    "decode_first_step_ms", "decode_tps", "decode_tps_per_gpu",
+    "decode_first_step_ms", "decode_tps", "decode_tps_instance",
+    "decode_tps_per_gpu", "decode_qps_instance",
     # decode verification columns
     "decode_total_ms_approx", "decode_total_ms_exact", "approx_error_pct",
 ]
@@ -65,15 +70,39 @@ def load_base_config():
     )
 
 
-def make_config(base_cfg, tp, ep, dp, batch_size, seq_len, sp, shared_expert_overlapped):
+def make_config(base_cfg, tp, ep, dp, batch_size, seq_len, sp, shared_expert_overlapped,
+                input_len=None, decode_context_len=None, prefix_cache_hit_rate=0.0):
     """Create a new Config with modified runtime parameters."""
     new_rt = replace(
         base_cfg.rt,
         tp=tp, ep=ep, dp=dp,
         batch_size=batch_size, seq_len=seq_len,
         sp=sp, shared_expert_overlapped=shared_expert_overlapped,
+        input_len=input_len, decode_context_len=decode_context_len,
+        prefix_cache_hit_rate=prefix_cache_hit_rate,
     )
     return replace(base_cfg, rt=new_rt)
+
+
+def make_phase_configs(base_cfg, phase, tp, ep, dp, batch_size, seq_len, sp,
+                       shared_expert_overlapped, prefix_cache_hit_rate):
+    """Build full-context memory cfg and phase-specific compute cfg."""
+    full_cfg = make_config(
+        base_cfg,
+        tp=tp, ep=ep, dp=dp,
+        batch_size=batch_size, seq_len=seq_len,
+        sp=sp, shared_expert_overlapped=shared_expert_overlapped,
+        input_len=seq_len,
+        decode_context_len=seq_len,
+        prefix_cache_hit_rate=prefix_cache_hit_rate,
+    )
+    eval_seq_len = (
+        full_cfg.rt.effective_prefill_len
+        if phase == "prefill"
+        else full_cfg.rt.decode_context_len_effective
+    )
+    eval_cfg = replace(full_cfg, rt=replace(full_cfg.rt, seq_len=eval_seq_len))
+    return full_cfg, eval_cfg
 
 
 def check_memory(cfg):
@@ -110,19 +139,27 @@ def approx_decode(cfg):
     return first.total_time_s, approx_total_s
 
 
-def evaluate_prefill(cfg):
+def evaluate_prefill(cfg, logical_input_len=None):
     """Run prefill model and return metrics dict."""
     prefill = prefill_model(cfg)
     prefill_ms = prefill.total_time_s * 1000
-    B = cfg.rt.batch_size // cfg.rt.dp
-    S = cfg.rt.seq_len
+    logical_len = logical_input_len if logical_input_len is not None else cfg.rt.request_input_len
     physical_gpus = cfg.rt.tp * cfg.rt.dp
-    prefill_tps = B * S / prefill.total_time_s if prefill.total_time_s > 0 else 0
-    prefill_tps_per_gpu = prefill_tps / physical_gpus if physical_gpus > 0 else 0
+    prefill_tps_instance = (
+        cfg.rt.batch_size * logical_len / prefill.total_time_s
+        if prefill.total_time_s > 0 else 0
+    )
+    prefill_tps_per_gpu = prefill_tps_instance / physical_gpus if physical_gpus > 0 else 0
+    prefill_qps_instance = (
+        cfg.rt.batch_size / prefill.total_time_s
+        if prefill.total_time_s > 0 else 0
+    )
     return {
         "prefill_time_ms": prefill_ms,
-        "prefill_tps": prefill_tps,
+        "prefill_tps": prefill_tps_instance,
+        "prefill_tps_instance": prefill_tps_instance,
         "prefill_tps_per_gpu": prefill_tps_per_gpu,
+        "prefill_qps_instance": prefill_qps_instance,
     }
 
 
@@ -131,15 +168,23 @@ def evaluate_decode(cfg):
     output_len = cfg.rt.output_len
     first_step_s, approx_total_s = approx_decode(cfg)
     first_step_ms = first_step_s * 1000
-    B = cfg.rt.batch_size // cfg.rt.dp
     physical_gpus = cfg.rt.tp * cfg.rt.dp
-    decode_tps = B * output_len / approx_total_s if approx_total_s > 0 else 0
-    decode_tps_per_gpu = decode_tps / physical_gpus if physical_gpus > 0 else 0
+    decode_tps_instance = (
+        cfg.rt.batch_size * output_len / approx_total_s
+        if approx_total_s > 0 else 0
+    )
+    decode_tps_per_gpu = decode_tps_instance / physical_gpus if physical_gpus > 0 else 0
+    decode_qps_instance = (
+        cfg.rt.batch_size / approx_total_s
+        if approx_total_s > 0 else 0
+    )
     return {
         "decode_first_step_ms": first_step_ms,
         "decode_total_ms_approx": approx_total_s * 1000,
-        "decode_tps": decode_tps,
+        "decode_tps": decode_tps_instance,
+        "decode_tps_instance": decode_tps_instance,
         "decode_tps_per_gpu": decode_tps_per_gpu,
+        "decode_qps_instance": decode_qps_instance,
     }
 
 
@@ -158,6 +203,9 @@ def verify_decode_top_n(results, base_cfg, top_n=10):
                 if isinstance(row["shared_expert_overlapped"], bool)
                 else row["shared_expert_overlapped"] == "True"
             ),
+            input_len=int(row.get("logical_input_len", row["seq_len"])),
+            decode_context_len=int(row.get("decode_context_len", row["seq_len"])),
+            prefix_cache_hit_rate=float(row.get("prefix_cache_hit_rate", 0.0)),
         )
         decode_total = decode_model(cfg)
         decode_exact_ms = decode_total.total_time_s * 1000
@@ -170,14 +218,22 @@ def verify_decode_top_n(results, base_cfg, top_n=10):
         else:
             row["approx_error_pct"] = "0.00"
 
-        # Recompute exact throughput
-        B = int(row["batch_size"]) // int(row["dp"])
+        # Recompute exact instance throughput.
         output_len = cfg.rt.output_len
         physical_gpus = int(row["physical_gpus"])
-        exact_tps = B * output_len / decode_total.total_time_s if decode_total.total_time_s > 0 else 0
-        exact_tps_per_gpu = exact_tps / physical_gpus if physical_gpus > 0 else 0
-        row["decode_tps"] = f"{exact_tps:.3f}"
+        exact_tps_instance = (
+            int(row["batch_size"]) * output_len / decode_total.total_time_s
+            if decode_total.total_time_s > 0 else 0
+        )
+        exact_tps_per_gpu = exact_tps_instance / physical_gpus if physical_gpus > 0 else 0
+        exact_qps_instance = (
+            int(row["batch_size"]) / decode_total.total_time_s
+            if decode_total.total_time_s > 0 else 0
+        )
+        row["decode_tps"] = f"{exact_tps_instance:.3f}"
+        row["decode_tps_instance"] = f"{exact_tps_instance:.3f}"
         row["decode_tps_per_gpu"] = f"{exact_tps_per_gpu:.3f}"
+        row["decode_qps_instance"] = f"{exact_qps_instance:.3f}"
 
         verified_count += 1
         print(f"  Verified {verified_count}/{top_n}: "
@@ -224,8 +280,9 @@ def run_search(base_cfg, phase, scenario):
     memory_filtered = 0
     evaluated = 0
 
-    for tp, ep, dp, batch_size, seq_len, sp, shared_ovl in product(
+    for tp, ep, dp, batch_size, seq_len, prefix_cache_hit_rate, sp, shared_ovl in product(
         TP_VALUES, EP_VALUES, DP_VALUES, BATCH_VALUES, SEQ_VALUES,
+        PREFIX_CACHE_HIT_RATE_VALUES,
         sp_values, ovl_values,
     ):
         total_combos += 1
@@ -241,32 +298,41 @@ def run_search(base_cfg, phase, scenario):
         if not validate_parallelism(tp, ep, base_cfg.model):
             continue
 
-        cfg = make_config(base_cfg, tp=tp, ep=ep, dp=dp, batch_size=batch_size,
-                          seq_len=seq_len, sp=sp, shared_expert_overlapped=shared_ovl)
+        full_cfg, eval_cfg = make_phase_configs(
+            base_cfg, phase=phase, tp=tp, ep=ep, dp=dp, batch_size=batch_size,
+            seq_len=seq_len, sp=sp, shared_expert_overlapped=shared_ovl,
+            prefix_cache_hit_rate=prefix_cache_hit_rate,
+        )
 
-        weight_gb, kv_gb, total_gb, fits = check_memory(cfg)
+        weight_gb, kv_gb, total_gb, fits = check_memory(full_cfg)
         if not fits:
             memory_filtered += 1
             continue
 
         # Evaluate only the relevant phase
         if phase == "prefill":
-            metrics = evaluate_prefill(cfg)
+            metrics = evaluate_prefill(eval_cfg, logical_input_len=full_cfg.rt.request_input_len)
         else:
-            metrics = evaluate_decode(cfg)
+            metrics = evaluate_decode(eval_cfg)
         evaluated += 1
 
         per_rank_batch = batch_size // dp
         row = {
             "tp": tp, "ep": ep, "dp": dp, "edp": edp,
             "batch_size": batch_size, "seq_len": seq_len,
+            "logical_input_len": full_cfg.rt.request_input_len,
+            "effective_prefill_len": full_cfg.rt.effective_prefill_len,
+            "decode_context_len": full_cfg.rt.decode_context_len_effective,
+            "prefix_cache_hit_rate": prefix_cache_hit_rate,
             "sp": sp, "shared_expert_overlapped": shared_ovl,
             "physical_gpus": physical_gpus, "per_rank_batch": per_rank_batch,
             "weight_gb": f"{weight_gb:.3f}", "kv_cache_gb": f"{kv_gb:.3f}",
             "hbm_total_gb": f"{total_gb:.3f}",
             # Phase columns not computed are left blank
-            "prefill_time_ms": "", "prefill_tps": "", "prefill_tps_per_gpu": "",
-            "decode_first_step_ms": "", "decode_tps": "", "decode_tps_per_gpu": "",
+            "prefill_time_ms": "", "prefill_tps": "", "prefill_tps_instance": "",
+            "prefill_tps_per_gpu": "", "prefill_qps_instance": "",
+            "decode_first_step_ms": "", "decode_tps": "", "decode_tps_instance": "",
+            "decode_tps_per_gpu": "", "decode_qps_instance": "",
             "decode_total_ms_approx": "", "decode_total_ms_exact": "", "approx_error_pct": "",
         }
         # Fill in computed metrics
@@ -400,6 +466,7 @@ def main():
             "dp": DP_VALUES,
             "batch_size": BATCH_VALUES,
             "seq_len": SEQ_VALUES,
+            "prefix_cache_hit_rate": PREFIX_CACHE_HIT_RATE_VALUES,
         },
         "constraints": {
             "min_gpus": MIN_GPUS,
