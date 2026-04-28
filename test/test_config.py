@@ -123,6 +123,8 @@ class TestRuntimeConfig(unittest.TestCase):
         self.assertIsNone(rt.input_len)
         self.assertIsNone(rt.decode_context_len)
         self.assertEqual(rt.prefix_cache_hit_rate, 0.0)
+        self.assertEqual(rt.weight_scale_overhead_bytes, 0.0)
+        self.assertEqual(rt.kv_scale_overhead_bytes, 0.0)
 
     def test_quant_and_mtp_defaults(self):
         rt = RuntimeConfig()
@@ -254,7 +256,8 @@ class TestConfigFromJson(unittest.TestCase):
                 json.dump({"cube_tflops": 100, "vec_tflops": 10,
                            "hbm_capacity_gb": 32, "hbm_bandwidth_gbps": 900,
                            "hbm_reserved_pct": 25,
-                           "flops_utilization": 0.6, "hbm_bw_utilization": 0.7}, f)
+                           "flops_utilization": 0.6, "hbm_bw_utilization": 0.7,
+                           "w8a8_tflops": 250}, f)
             with open(net_path, "w") as f:
                 json.dump({"tp_bandwidth_GBps": 200, "ep_bandwidth_GBps": 200,
                            "latency_us": 5, "bandwidth_utilization": 0.9}, f)
@@ -280,13 +283,17 @@ class TestConfigFromJson(unittest.TestCase):
                            "prefix_cache_hit_rate": 0.25,
                            "mtp": 1, "mtp_accept_ratio": 0.9,
                            "quant_mode": "w8a8",
-                           "kv_cache_quant_mode": "kv8"}, f)
+                           "kv_cache_quant_mode": "kv8",
+                           "weight_scale_overhead_bytes": 123.0,
+                           "kv_scale_overhead_bytes": 45.0}, f)
 
             cfg = Config.from_json(hw_path, net_path, model_path, rt_path)
 
             self.assertEqual(cfg.hw.cube_tflops, 100)
             self.assertEqual(cfg.hw.hbm_reserved_pct, 25)
             self.assertEqual(cfg.hw.usable_hbm_capacity_gb, 24)
+            self.assertEqual(cfg.hw.w8a8_tflops, 250)
+            self.assertEqual(cfg.hw.effective_w8a8_tflops, 250)
             self.assertEqual(cfg.net.tp_bandwidth_gbps, 200)
             self.assertEqual(cfg.model.hidden_size, 512)
             self.assertFalse(hasattr(cfg.model, "extra_field"))
@@ -304,6 +311,8 @@ class TestConfigFromJson(unittest.TestCase):
             self.assertEqual(cfg.rt.mtp_accept_ratio, 0.9)
             self.assertEqual(cfg.rt.quant_mode, "w8a8")
             self.assertEqual(cfg.rt.kv_cache_quant_mode, "kv8")
+            self.assertEqual(cfg.rt.weight_scale_overhead_bytes, 123.0)
+            self.assertEqual(cfg.rt.kv_scale_overhead_bytes, 45.0)
 
 
 class TestMakeConfig(unittest.TestCase):
