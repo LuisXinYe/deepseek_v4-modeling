@@ -1,0 +1,876 @@
+{
+  "910C": {
+    "8K_4K": {
+      "prefill_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 512,
+        "gpus": 16,
+        "tps_per_gpu": 7212.07,
+        "tps_instance": 115393.04,
+        "qps_instance": 14.0861
+      },
+      "decode_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 512,
+        "gpus": 16,
+        "tps_per_gpu": 924.0,
+        "tps_instance": 14783.97,
+        "qps_instance": 3.6094
+      },
+      "input_len": 8192,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.0,
+      "pd_ratio_float": 0.256,
+      "pd_ratio_ceil": 1,
+      "total_gpus_min": 32,
+      "label": "1P:1D"
+    },
+    "8K_4K_hit90": {
+      "prefill_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 512,
+        "gpus": 16,
+        "tps_per_gpu": 74052.33,
+        "tps_instance": 1184837.32,
+        "qps_instance": 144.6335
+      },
+      "decode_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 512,
+        "gpus": 16,
+        "tps_per_gpu": 924.0,
+        "tps_instance": 14783.97,
+        "qps_instance": 3.6094
+      },
+      "input_len": 8192,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.9,
+      "pd_ratio_float": 0.025,
+      "pd_ratio_ceil": 1,
+      "total_gpus_min": 32,
+      "label": "1P:1D"
+    },
+    "8K_4K_hit99": {
+      "prefill_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 512,
+        "gpus": 16,
+        "tps_per_gpu": 711356.74,
+        "tps_instance": 11381707.8,
+        "qps_instance": 1389.3686
+      },
+      "decode_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 512,
+        "gpus": 16,
+        "tps_per_gpu": 924.0,
+        "tps_instance": 14783.97,
+        "qps_instance": 3.6094
+      },
+      "input_len": 8192,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.99,
+      "pd_ratio_float": 0.003,
+      "pd_ratio_ceil": 1,
+      "total_gpus_min": 32,
+      "label": "1P:1D"
+    },
+    "32K_4K": {
+      "prefill_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 512,
+        "gpus": 16,
+        "tps_per_gpu": 6523.77,
+        "tps_instance": 104380.27,
+        "qps_instance": 3.1854
+      },
+      "decode_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 512,
+        "gpus": 16,
+        "tps_per_gpu": 880.32,
+        "tps_instance": 14085.1,
+        "qps_instance": 3.4387
+      },
+      "input_len": 32768,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.0,
+      "pd_ratio_float": 1.08,
+      "pd_ratio_ceil": 2,
+      "total_gpus_min": 48,
+      "label": "2P:1D"
+    },
+    "32K_4K_hit90": {
+      "prefill_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 512,
+        "gpus": 16,
+        "tps_per_gpu": 73472.1,
+        "tps_instance": 1175553.56,
+        "qps_instance": 35.875
+      },
+      "decode_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 512,
+        "gpus": 16,
+        "tps_per_gpu": 880.32,
+        "tps_instance": 14085.1,
+        "qps_instance": 3.4387
+      },
+      "input_len": 32768,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.9,
+      "pd_ratio_float": 0.096,
+      "pd_ratio_ceil": 1,
+      "total_gpus_min": 32,
+      "label": "1P:1D"
+    },
+    "32K_4K_hit99": {
+      "prefill_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 512,
+        "gpus": 16,
+        "tps_per_gpu": 740310.47,
+        "tps_instance": 11844967.6,
+        "qps_instance": 361.4797
+      },
+      "decode_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 512,
+        "gpus": 16,
+        "tps_per_gpu": 880.32,
+        "tps_instance": 14085.1,
+        "qps_instance": 3.4387
+      },
+      "input_len": 32768,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.99,
+      "pd_ratio_float": 0.01,
+      "pd_ratio_ceil": 1,
+      "total_gpus_min": 32,
+      "label": "1P:1D"
+    },
+    "128K_4K": {
+      "prefill_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 128,
+        "gpus": 16,
+        "tps_per_gpu": 4639.2,
+        "tps_instance": 74227.13,
+        "qps_instance": 0.5663
+      },
+      "decode_config": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 256,
+        "gpus": 32,
+        "tps_per_gpu": 297.54,
+        "tps_instance": 9521.13,
+        "qps_instance": 2.3245
+      },
+      "input_len": 131072,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.0,
+      "pd_ratio_float": 4.105,
+      "pd_ratio_ceil": 5,
+      "total_gpus_min": 112,
+      "label": "5P:1D"
+    },
+    "128K_4K_hit90": {
+      "prefill_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 128,
+        "gpus": 16,
+        "tps_per_gpu": 70789.81,
+        "tps_instance": 1132636.99,
+        "qps_instance": 8.6413
+      },
+      "decode_config": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 256,
+        "gpus": 32,
+        "tps_per_gpu": 297.54,
+        "tps_instance": 9521.13,
+        "qps_instance": 2.3245
+      },
+      "input_len": 131072,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.9,
+      "pd_ratio_float": 0.269,
+      "pd_ratio_ceil": 1,
+      "total_gpus_min": 48,
+      "label": "1P:1D"
+    },
+    "128K_4K_hit99": {
+      "prefill_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 128,
+        "gpus": 16,
+        "tps_per_gpu": 738608.73,
+        "tps_instance": 11817739.71,
+        "qps_instance": 90.1622
+      },
+      "decode_config": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 256,
+        "gpus": 32,
+        "tps_per_gpu": 297.54,
+        "tps_instance": 9521.13,
+        "qps_instance": 2.3245
+      },
+      "input_len": 131072,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.99,
+      "pd_ratio_float": 0.026,
+      "pd_ratio_ceil": 1,
+      "total_gpus_min": 48,
+      "label": "1P:1D"
+    },
+    "256K_4K": {
+      "prefill_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 64,
+        "gpus": 16,
+        "tps_per_gpu": 3349.19,
+        "tps_instance": 53587.0,
+        "qps_instance": 0.2044
+      },
+      "decode_config": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 128,
+        "gpus": 32,
+        "tps_per_gpu": 154.39,
+        "tps_instance": 4940.33,
+        "qps_instance": 1.2061
+      },
+      "input_len": 262144,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.0,
+      "pd_ratio_float": 5.9,
+      "pd_ratio_ceil": 6,
+      "total_gpus_min": 128,
+      "label": "6P:1D"
+    },
+    "256K_4K_hit90": {
+      "prefill_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 64,
+        "gpus": 16,
+        "tps_per_gpu": 67044.38,
+        "tps_instance": 1072710.08,
+        "qps_instance": 4.0921
+      },
+      "decode_config": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 128,
+        "gpus": 32,
+        "tps_per_gpu": 154.39,
+        "tps_instance": 4940.33,
+        "qps_instance": 1.2061
+      },
+      "input_len": 262144,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.9,
+      "pd_ratio_float": 0.295,
+      "pd_ratio_ceil": 1,
+      "total_gpus_min": 48,
+      "label": "1P:1D"
+    },
+    "256K_4K_hit99": {
+      "prefill_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 64,
+        "gpus": 16,
+        "tps_per_gpu": 734872.82,
+        "tps_instance": 11757965.13,
+        "qps_instance": 44.8531
+      },
+      "decode_config": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 128,
+        "gpus": 32,
+        "tps_per_gpu": 154.39,
+        "tps_instance": 4940.33,
+        "qps_instance": 1.2061
+      },
+      "input_len": 262144,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.99,
+      "pd_ratio_float": 0.027,
+      "pd_ratio_ceil": 1,
+      "total_gpus_min": 48,
+      "label": "1P:1D"
+    },
+    "1M_4K": {
+      "prefill_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 16,
+        "gpus": 16,
+        "tps_per_gpu": 1305.56,
+        "tps_instance": 20888.96,
+        "qps_instance": 0.0209
+      },
+      "decode_config": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 32,
+        "gpus": 32,
+        "tps_per_gpu": 40.1,
+        "tps_instance": 1283.31,
+        "qps_instance": 0.3133
+      },
+      "input_len": 1000000,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.0,
+      "pd_ratio_float": 14.999,
+      "pd_ratio_ceil": 15,
+      "total_gpus_min": 272,
+      "label": "15P:1D"
+    },
+    "1M_4K_hit90": {
+      "prefill_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 16,
+        "gpus": 16,
+        "tps_per_gpu": 51046.39,
+        "tps_instance": 816742.27,
+        "qps_instance": 0.8167
+      },
+      "decode_config": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 32,
+        "gpus": 32,
+        "tps_per_gpu": 40.1,
+        "tps_instance": 1283.31,
+        "qps_instance": 0.3133
+      },
+      "input_len": 1000000,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.9,
+      "pd_ratio_float": 0.384,
+      "pd_ratio_ceil": 1,
+      "total_gpus_min": 48,
+      "label": "1P:1D"
+    },
+    "1M_4K_hit99": {
+      "prefill_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 16,
+        "gpus": 16,
+        "tps_per_gpu": 714613.89,
+        "tps_instance": 11433822.16,
+        "qps_instance": 11.4338
+      },
+      "decode_config": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 32,
+        "gpus": 32,
+        "tps_per_gpu": 40.1,
+        "tps_instance": 1283.31,
+        "qps_instance": 0.3133
+      },
+      "input_len": 1000000,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.99,
+      "pd_ratio_float": 0.027,
+      "pd_ratio_ceil": 1,
+      "total_gpus_min": 48,
+      "label": "1P:1D"
+    }
+  },
+  "H20": {
+    "8K_4K": {
+      "prefill_config": {
+        "tp": 1,
+        "ep": 8,
+        "dp": 8,
+        "batch_size": 512,
+        "gpus": 8,
+        "tps_per_gpu": 2977.61,
+        "tps_instance": 23820.87,
+        "qps_instance": 2.9078
+      },
+      "decode_config": {
+        "tp": 1,
+        "ep": 8,
+        "dp": 8,
+        "batch_size": 512,
+        "gpus": 8,
+        "tps_per_gpu": 1519.29,
+        "tps_instance": 12154.35,
+        "qps_instance": 2.9674
+      },
+      "input_len": 8192,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.0,
+      "pd_ratio_float": 1.02,
+      "pd_ratio_ceil": 2,
+      "total_gpus_min": 24,
+      "label": "2P:1D"
+    },
+    "8K_4K_hit90": {
+      "prefill_config": {
+        "tp": 1,
+        "ep": 8,
+        "dp": 8,
+        "batch_size": 512,
+        "gpus": 8,
+        "tps_per_gpu": 30660.88,
+        "tps_instance": 245287.06,
+        "qps_instance": 29.9423
+      },
+      "decode_config": {
+        "tp": 1,
+        "ep": 8,
+        "dp": 8,
+        "batch_size": 512,
+        "gpus": 8,
+        "tps_per_gpu": 1519.29,
+        "tps_instance": 12154.35,
+        "qps_instance": 2.9674
+      },
+      "input_len": 8192,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.9,
+      "pd_ratio_float": 0.099,
+      "pd_ratio_ceil": 1,
+      "total_gpus_min": 16,
+      "label": "1P:1D"
+    },
+    "8K_4K_hit99": {
+      "prefill_config": {
+        "tp": 1,
+        "ep": 8,
+        "dp": 8,
+        "batch_size": 512,
+        "gpus": 8,
+        "tps_per_gpu": 307336.58,
+        "tps_instance": 2458692.67,
+        "qps_instance": 300.1334
+      },
+      "decode_config": {
+        "tp": 1,
+        "ep": 8,
+        "dp": 8,
+        "batch_size": 512,
+        "gpus": 8,
+        "tps_per_gpu": 1519.29,
+        "tps_instance": 12154.35,
+        "qps_instance": 2.9674
+      },
+      "input_len": 8192,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.99,
+      "pd_ratio_float": 0.01,
+      "pd_ratio_ceil": 1,
+      "total_gpus_min": 16,
+      "label": "1P:1D"
+    },
+    "32K_4K": {
+      "prefill_config": {
+        "tp": 1,
+        "ep": 8,
+        "dp": 8,
+        "batch_size": 256,
+        "gpus": 8,
+        "tps_per_gpu": 2693.91,
+        "tps_instance": 21551.28,
+        "qps_instance": 0.6577
+      },
+      "decode_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 512,
+        "gpus": 16,
+        "tps_per_gpu": 1145.34,
+        "tps_instance": 18325.49,
+        "qps_instance": 4.474
+      },
+      "input_len": 32768,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.0,
+      "pd_ratio_float": 6.803,
+      "pd_ratio_ceil": 7,
+      "total_gpus_min": 72,
+      "label": "7P:1D"
+    },
+    "32K_4K_hit90": {
+      "prefill_config": {
+        "tp": 1,
+        "ep": 8,
+        "dp": 8,
+        "batch_size": 256,
+        "gpus": 8,
+        "tps_per_gpu": 30416.64,
+        "tps_instance": 243333.09,
+        "qps_instance": 7.4259
+      },
+      "decode_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 512,
+        "gpus": 16,
+        "tps_per_gpu": 1145.34,
+        "tps_instance": 18325.49,
+        "qps_instance": 4.474
+      },
+      "input_len": 32768,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.9,
+      "pd_ratio_float": 0.602,
+      "pd_ratio_ceil": 1,
+      "total_gpus_min": 24,
+      "label": "1P:1D"
+    },
+    "32K_4K_hit99": {
+      "prefill_config": {
+        "tp": 1,
+        "ep": 8,
+        "dp": 8,
+        "batch_size": 256,
+        "gpus": 8,
+        "tps_per_gpu": 307117.07,
+        "tps_instance": 2456936.54,
+        "qps_instance": 74.9798
+      },
+      "decode_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 512,
+        "gpus": 16,
+        "tps_per_gpu": 1145.34,
+        "tps_instance": 18325.49,
+        "qps_instance": 4.474
+      },
+      "input_len": 32768,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.99,
+      "pd_ratio_float": 0.06,
+      "pd_ratio_ceil": 1,
+      "total_gpus_min": 24,
+      "label": "1P:1D"
+    },
+    "128K_4K": {
+      "prefill_config": {
+        "tp": 1,
+        "ep": 8,
+        "dp": 8,
+        "batch_size": 64,
+        "gpus": 8,
+        "tps_per_gpu": 1950.53,
+        "tps_instance": 15604.26,
+        "qps_instance": 0.1191
+      },
+      "decode_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 256,
+        "gpus": 16,
+        "tps_per_gpu": 714.93,
+        "tps_instance": 11438.89,
+        "qps_instance": 2.7927
+      },
+      "input_len": 131072,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.0,
+      "pd_ratio_float": 23.458,
+      "pd_ratio_ceil": 24,
+      "total_gpus_min": 208,
+      "label": "24P:1D"
+    },
+    "128K_4K_hit90": {
+      "prefill_config": {
+        "tp": 1,
+        "ep": 8,
+        "dp": 8,
+        "batch_size": 64,
+        "gpus": 8,
+        "tps_per_gpu": 29160.93,
+        "tps_instance": 233287.47,
+        "qps_instance": 1.7798
+      },
+      "decode_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 256,
+        "gpus": 16,
+        "tps_per_gpu": 714.93,
+        "tps_instance": 11438.89,
+        "qps_instance": 2.7927
+      },
+      "input_len": 131072,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.9,
+      "pd_ratio_float": 1.569,
+      "pd_ratio_ceil": 2,
+      "total_gpus_min": 32,
+      "label": "2P:1D"
+    },
+    "128K_4K_hit99": {
+      "prefill_config": {
+        "tp": 1,
+        "ep": 8,
+        "dp": 8,
+        "batch_size": 64,
+        "gpus": 8,
+        "tps_per_gpu": 306278.64,
+        "tps_instance": 2450229.12,
+        "qps_instance": 18.6938
+      },
+      "decode_config": {
+        "tp": 2,
+        "ep": 16,
+        "dp": 8,
+        "batch_size": 256,
+        "gpus": 16,
+        "tps_per_gpu": 714.93,
+        "tps_instance": 11438.89,
+        "qps_instance": 2.7927
+      },
+      "input_len": 131072,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.99,
+      "pd_ratio_float": 0.149,
+      "pd_ratio_ceil": 1,
+      "total_gpus_min": 24,
+      "label": "1P:1D"
+    },
+    "256K_4K": {
+      "prefill_config": {
+        "tp": 1,
+        "ep": 8,
+        "dp": 8,
+        "batch_size": 32,
+        "gpus": 8,
+        "tps_per_gpu": 1425.9,
+        "tps_instance": 11407.21,
+        "qps_instance": 0.0435
+      },
+      "decode_config": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 256,
+        "gpus": 32,
+        "tps_per_gpu": 427.72,
+        "tps_instance": 13686.94,
+        "qps_instance": 3.3415
+      },
+      "input_len": 262144,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.0,
+      "pd_ratio_float": 76.79,
+      "pd_ratio_ceil": 77,
+      "total_gpus_min": 648,
+      "label": "77P:1D"
+    },
+    "256K_4K_hit90": {
+      "prefill_config": {
+        "tp": 1,
+        "ep": 8,
+        "dp": 8,
+        "batch_size": 32,
+        "gpus": 8,
+        "tps_per_gpu": 27642.86,
+        "tps_instance": 221142.9,
+        "qps_instance": 0.8436
+      },
+      "decode_config": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 256,
+        "gpus": 32,
+        "tps_per_gpu": 427.72,
+        "tps_instance": 13686.94,
+        "qps_instance": 3.3415
+      },
+      "input_len": 262144,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.9,
+      "pd_ratio_float": 3.961,
+      "pd_ratio_ceil": 4,
+      "total_gpus_min": 64,
+      "label": "4P:1D"
+    },
+    "256K_4K_hit99": {
+      "prefill_config": {
+        "tp": 1,
+        "ep": 8,
+        "dp": 8,
+        "batch_size": 32,
+        "gpus": 8,
+        "tps_per_gpu": 304854.4,
+        "tps_instance": 2438835.18,
+        "qps_instance": 9.3034
+      },
+      "decode_config": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 256,
+        "gpus": 32,
+        "tps_per_gpu": 427.72,
+        "tps_instance": 13686.94,
+        "qps_instance": 3.3415
+      },
+      "input_len": 262144,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.99,
+      "pd_ratio_float": 0.359,
+      "pd_ratio_ceil": 1,
+      "total_gpus_min": 40,
+      "label": "1P:1D"
+    },
+    "1M_4K": {
+      "prefill_config": {
+        "tp": 1,
+        "ep": 8,
+        "dp": 8,
+        "batch_size": 8,
+        "gpus": 8,
+        "tps_per_gpu": 567.16,
+        "tps_instance": 4537.29,
+        "qps_instance": 0.0045
+      },
+      "decode_config": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 64,
+        "gpus": 32,
+        "tps_per_gpu": 137.12,
+        "tps_instance": 4387.69,
+        "qps_instance": 1.0712
+      },
+      "input_len": 1000000,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.0,
+      "pd_ratio_float": 236.091,
+      "pd_ratio_ceil": 237,
+      "total_gpus_min": 1928,
+      "label": "237P:1D"
+    },
+    "1M_4K_hit90": {
+      "prefill_config": {
+        "tp": 1,
+        "ep": 8,
+        "dp": 8,
+        "batch_size": 8,
+        "gpus": 8,
+        "tps_per_gpu": 21369.41,
+        "tps_instance": 170955.26,
+        "qps_instance": 0.171
+      },
+      "decode_config": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 64,
+        "gpus": 32,
+        "tps_per_gpu": 137.12,
+        "tps_instance": 4387.69,
+        "qps_instance": 1.0712
+      },
+      "input_len": 1000000,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.9,
+      "pd_ratio_float": 6.266,
+      "pd_ratio_ceil": 7,
+      "total_gpus_min": 88,
+      "label": "7P:1D"
+    },
+    "1M_4K_hit99": {
+      "prefill_config": {
+        "tp": 1,
+        "ep": 8,
+        "dp": 8,
+        "batch_size": 8,
+        "gpus": 8,
+        "tps_per_gpu": 295438.74,
+        "tps_instance": 2363509.92,
+        "qps_instance": 2.3635
+      },
+      "decode_config": {
+        "tp": 4,
+        "ep": 32,
+        "dp": 8,
+        "batch_size": 64,
+        "gpus": 32,
+        "tps_per_gpu": 137.12,
+        "tps_instance": 4387.69,
+        "qps_instance": 1.0712
+      },
+      "input_len": 1000000,
+      "output_len": 4096,
+      "prefix_cache_hit_rate": 0.99,
+      "pd_ratio_float": 0.453,
+      "pd_ratio_ceil": 1,
+      "total_gpus_min": 40,
+      "label": "1P:1D"
+    }
+  }
+}

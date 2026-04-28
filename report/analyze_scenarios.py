@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Comprehensive analysis: parameter search, P/D ratio, op analysis for DeepSeek V4.
 
-Runs 24 search scenarios (3 combos × 4 phases × 2 hardware platforms),
-computes P/D disaggregation ratios, and exports JSON data for report generation.
+Runs search scenarios across context lengths, prefix-cache hit rates, phases, and
+hardware platforms, computes P/D disaggregation ratios, and exports JSON data for
+report generation.
 """
 
 import json
@@ -33,10 +34,12 @@ COMBOS = [
     {"name": "32K_4K",  "seq_len": 32768,  "output_len": 4096},
     {"name": "128K_4K", "seq_len": 131072, "output_len": 4096},
     {"name": "256K_4K", "seq_len": 262144, "output_len": 4096},
+    {"name": "1M_4K",   "seq_len": 1_000_000, "output_len": 4096},
 ]
+PREFIX_CACHE_HIT_RATE_VALUES = [0.0, 0.9, 0.99]
 
-PREFILL_GPU_VALUES = [8, 16, 32, 64, 128, 256]
-DECODE_GPU_VALUES = [16, 32]
+PREFILL_GPU_VALUES = [8, 16, 32, 64]
+DECODE_GPU_VALUES = [8, 16, 32, 64]
 
 TP_VALUES = [1, 2, 4, 8, 16, 32, 64]
 EP_VALUES = [1, 2, 4, 8, 16, 32, 64, 128, 256]
@@ -57,6 +60,23 @@ HARDWARE_CONFIGS = {
 }
 
 
+def combo_result_name(combo_name, prefix_cache_hit_rate):
+    """Return a stable result key for a base combo and prefix-cache hit rate."""
+    if prefix_cache_hit_rate == 0.0:
+        return combo_name
+    return f"{combo_name}_hit{int(round(prefix_cache_hit_rate * 100))}"
+
+
+def iter_result_combos():
+    """Yield every report combo expanded by prefix-cache hit rate."""
+    for combo in COMBOS:
+        for prefix_cache_hit_rate in PREFIX_CACHE_HIT_RATE_VALUES:
+            result = dict(combo)
+            result["prefix_cache_hit_rate"] = prefix_cache_hit_rate
+            result["result_name"] = combo_result_name(combo["name"], prefix_cache_hit_rate)
+            yield result
+
+
 # ---------------------------------------------------------------------------
 # Config helpers
 # ---------------------------------------------------------------------------
@@ -73,13 +93,17 @@ def load_base_config(hw_name):
 
 def make_config(base_cfg, tp, ep, dp, batch_size, seq_len, output_len,
                 sp=True, shared_expert_overlapped=True, mhc_sp=False,
-                mhc_kernel_fused=None, mhc_fused_bf16=None):
+                mhc_kernel_fused=None, mhc_fused_bf16=None,
+                input_len=None, decode_context_len=None, prefix_cache_hit_rate=0.0):
     kwargs = dict(
         tp=tp, ep=ep, dp=dp,
         batch_size=batch_size, seq_len=seq_len,
         output_len=output_len,
         sp=sp, shared_expert_overlapped=shared_expert_overlapped,
         mhc_sp=mhc_sp,
+        input_len=input_len,
+        decode_context_len=decode_context_len,
+        prefix_cache_hit_rate=prefix_cache_hit_rate,
     )
     if mhc_kernel_fused is not None:
         kwargs["mhc_kernel_fused"] = mhc_kernel_fused
@@ -87,6 +111,24 @@ def make_config(base_cfg, tp, ep, dp, batch_size, seq_len, output_len,
         kwargs["mhc_fused_bf16"] = mhc_fused_bf16
     new_rt = replace(base_cfg.rt, **kwargs)
     return replace(base_cfg, rt=new_rt)
+
+
+def make_phase_configs(base_cfg, phase, tp, ep, dp, batch_size, seq_len, output_len,
+                       prefix_cache_hit_rate):
+    """Build full-context memory cfg and phase-specific compute cfg."""
+    full_cfg = make_config(
+        base_cfg, tp=tp, ep=ep, dp=dp, batch_size=batch_size,
+        seq_len=seq_len, output_len=output_len,
+        input_len=seq_len, decode_context_len=seq_len,
+        prefix_cache_hit_rate=prefix_cache_hit_rate,
+    )
+    eval_seq_len = (
+        full_cfg.rt.effective_prefill_len
+        if phase == "prefill"
+        else full_cfg.rt.decode_context_len_effective
+    )
+    eval_cfg = replace(full_cfg, rt=replace(full_cfg.rt, seq_len=eval_seq_len))
+    return full_cfg, eval_cfg
 
 
 def validate_parallelism(tp, ep, model_cfg):
@@ -117,18 +159,26 @@ def approx_decode(cfg):
     return first.total_time_s, approx_total_s
 
 
-def evaluate_prefill(cfg):
+def evaluate_prefill(cfg, logical_input_len=None):
     prefill = prefill_model(cfg)
     prefill_ms = prefill.total_time_s * 1000
-    B = cfg.rt.batch_size // cfg.rt.dp
-    S = cfg.rt.seq_len
+    logical_len = logical_input_len if logical_input_len is not None else cfg.rt.request_input_len
     physical_gpus = cfg.rt.tp * cfg.rt.dp
-    prefill_tps = B * S / prefill.total_time_s if prefill.total_time_s > 0 else 0
+    prefill_tps = (
+        cfg.rt.batch_size * logical_len / prefill.total_time_s
+        if prefill.total_time_s > 0 else 0
+    )
     prefill_tps_per_gpu = prefill_tps / physical_gpus if physical_gpus > 0 else 0
+    prefill_qps_instance = (
+        cfg.rt.batch_size / prefill.total_time_s
+        if prefill.total_time_s > 0 else 0
+    )
     return {
         "prefill_time_ms": prefill_ms,
         "prefill_tps": prefill_tps,
+        "prefill_tps_instance": prefill_tps,
         "prefill_tps_per_gpu": prefill_tps_per_gpu,
+        "prefill_qps_instance": prefill_qps_instance,
     }
 
 
@@ -136,15 +186,23 @@ def evaluate_decode(cfg):
     output_len = cfg.rt.output_len
     first_step_s, approx_total_s = approx_decode(cfg)
     first_step_ms = first_step_s * 1000
-    B = cfg.rt.batch_size // cfg.rt.dp
     physical_gpus = cfg.rt.tp * cfg.rt.dp
-    decode_tps = B * output_len / approx_total_s if approx_total_s > 0 else 0
+    decode_tps = (
+        cfg.rt.batch_size * output_len / approx_total_s
+        if approx_total_s > 0 else 0
+    )
     decode_tps_per_gpu = decode_tps / physical_gpus if physical_gpus > 0 else 0
+    decode_qps_instance = (
+        cfg.rt.batch_size / approx_total_s
+        if approx_total_s > 0 else 0
+    )
     return {
         "decode_first_step_ms": first_step_ms,
         "decode_total_ms_approx": approx_total_s * 1000,
         "decode_tps": decode_tps,
+        "decode_tps_instance": decode_tps,
         "decode_tps_per_gpu": decode_tps_per_gpu,
+        "decode_qps_instance": decode_qps_instance,
     }
 
 
@@ -152,7 +210,8 @@ def evaluate_decode(cfg):
 # Grid Search
 # ---------------------------------------------------------------------------
 
-def run_search(base_cfg, phase, seq_len, output_len, hbm_limit_gb, gpu_values):
+def run_search(base_cfg, phase, seq_len, output_len, hbm_limit_gb, gpu_values,
+               prefix_cache_hit_rate=0.0):
     """Run grid search for a single scenario."""
     results = []
     evaluated = 0
@@ -169,19 +228,21 @@ def run_search(base_cfg, phase, seq_len, output_len, hbm_limit_gb, gpu_values):
         if not validate_parallelism(tp, ep, base_cfg.model):
             continue
 
-        cfg = make_config(base_cfg, tp=tp, ep=ep, dp=dp,
-                          batch_size=batch_size, seq_len=seq_len,
-                          output_len=output_len)
+        full_cfg, eval_cfg = make_phase_configs(
+            base_cfg, phase=phase, tp=tp, ep=ep, dp=dp,
+            batch_size=batch_size, seq_len=seq_len, output_len=output_len,
+            prefix_cache_hit_rate=prefix_cache_hit_rate,
+        )
 
-        weight_gb, kv_gb, total_gb, fits = check_memory(cfg, hbm_limit_gb)
+        weight_gb, kv_gb, total_gb, fits = check_memory(full_cfg, hbm_limit_gb)
         if not fits:
             memory_filtered += 1
             continue
 
         if phase == "prefill":
-            metrics = evaluate_prefill(cfg)
+            metrics = evaluate_prefill(eval_cfg, logical_input_len=full_cfg.rt.request_input_len)
         else:
-            metrics = evaluate_decode(cfg)
+            metrics = evaluate_decode(eval_cfg)
         evaluated += 1
 
         per_rank_batch = batch_size // dp
@@ -189,6 +250,10 @@ def run_search(base_cfg, phase, seq_len, output_len, hbm_limit_gb, gpu_values):
         row = {
             "tp": tp, "ep": ep, "dp": dp, "edp": edp,
             "batch_size": batch_size, "seq_len": seq_len, "output_len": output_len,
+            "logical_input_len": full_cfg.rt.request_input_len,
+            "effective_prefill_len": full_cfg.rt.effective_prefill_len,
+            "decode_context_len": full_cfg.rt.decode_context_len_effective,
+            "prefix_cache_hit_rate": prefix_cache_hit_rate,
             "physical_gpus": physical_gpus, "per_rank_batch": per_rank_batch,
             "weight_gb": round(weight_gb, 3),
             "kv_cache_gb": round(kv_gb, 3),
@@ -220,17 +285,14 @@ def sort_results(results, phase, scenario):
 # P/D Ratio Calculator
 # ---------------------------------------------------------------------------
 
-def compute_pd_ratio(p_tps_per_gpu, g_p, d_tps_per_gpu, g_d, input_len, output_len):
+def compute_pd_ratio(p_qps_instance, d_qps_instance):
     """Compute minimum P:D instance ratio for QPS balance.
 
     Returns (ratio_float, n_p_per_d_ceil).
     """
-    p_tps_instance = p_tps_per_gpu * g_p
-    d_tps_instance = d_tps_per_gpu * g_d
-    if p_tps_instance == 0:
+    if p_qps_instance == 0:
         return float('inf'), 999
-    # N_p / N_d >= (D_tps_instance * input_len) / (P_tps_instance * output_len)
-    ratio = (d_tps_instance * input_len) / (p_tps_instance * output_len)
+    ratio = d_qps_instance / p_qps_instance
     return ratio, math.ceil(ratio)
 
 
@@ -323,7 +385,8 @@ def collect_all_ops_decode(cfg):
 # SP / mHC-SP Comparison
 # ---------------------------------------------------------------------------
 
-def run_sp_comparison(base_cfg, seq_len, output_len, tp, ep, dp, batch_size):
+def run_sp_comparison(base_cfg, seq_len, output_len, tp, ep, dp, batch_size,
+                      prefix_cache_hit_rate=0.0):
     """Run 3 SP configs and compare prefill times."""
     results = {}
 
@@ -334,10 +397,14 @@ def run_sp_comparison(base_cfg, seq_len, output_len, tp, ep, dp, batch_size):
     ]
 
     for label, sp, mhc_sp in configs:
-        cfg = make_config(base_cfg, tp=tp, ep=ep, dp=dp,
-                          batch_size=batch_size, seq_len=seq_len,
-                          output_len=output_len, sp=sp, mhc_sp=mhc_sp)
-        prefill = prefill_model(cfg)
+        full_cfg = make_config(
+            base_cfg, tp=tp, ep=ep, dp=dp,
+            batch_size=batch_size, seq_len=seq_len,
+            output_len=output_len, sp=sp, mhc_sp=mhc_sp,
+            input_len=seq_len, decode_context_len=seq_len,
+            prefix_cache_hit_rate=prefix_cache_hit_rate,
+        )
+        cfg = replace(full_cfg, rt=replace(full_cfg.rt, seq_len=full_cfg.rt.effective_prefill_len))
         all_ops, total_time = collect_all_ops_prefill(cfg)
         cat_breakdown = categorize_ops(all_ops)
 
@@ -345,6 +412,9 @@ def run_sp_comparison(base_cfg, seq_len, output_len, tp, ep, dp, batch_size):
             "prefill_time_ms": total_time * 1000,
             "sp": sp,
             "mhc_sp": mhc_sp,
+            "logical_input_len": full_cfg.rt.request_input_len,
+            "effective_prefill_len": full_cfg.rt.effective_prefill_len,
+            "prefix_cache_hit_rate": prefix_cache_hit_rate,
             "category_breakdown": cat_breakdown,
         }
 
@@ -367,29 +437,36 @@ MHC_OPTIMIZATION_LEVELS = [
 ]
 
 
-def run_mhc_optimization_comparison(base_cfg, seq_len, output_len, tp, ep, dp, batch_size):
+def run_mhc_optimization_comparison(base_cfg, seq_len, output_len, tp, ep, dp, batch_size,
+                                    prefix_cache_hit_rate=0.0):
     """Benchmark 4 mHC optimization levels for prefill and decode."""
     results = {}
 
     for level in MHC_OPTIMIZATION_LEVELS:
         label = level["label"]
-        cfg = make_config(base_cfg, tp=tp, ep=ep, dp=dp,
-                          batch_size=batch_size, seq_len=seq_len,
-                          output_len=output_len, sp=True,
-                          mhc_sp=level["mhc_sp"],
-                          mhc_kernel_fused=level["mhc_kernel_fused"],
-                          mhc_fused_bf16=level["mhc_fused_bf16"])
+        full_cfg = make_config(
+            base_cfg, tp=tp, ep=ep, dp=dp,
+            batch_size=batch_size, seq_len=seq_len,
+            output_len=output_len, sp=True,
+            mhc_sp=level["mhc_sp"],
+            mhc_kernel_fused=level["mhc_kernel_fused"],
+            mhc_fused_bf16=level["mhc_fused_bf16"],
+            input_len=seq_len, decode_context_len=seq_len,
+            prefix_cache_hit_rate=prefix_cache_hit_rate,
+        )
+        prefill_cfg = replace(full_cfg, rt=replace(full_cfg.rt, seq_len=full_cfg.rt.effective_prefill_len))
+        decode_cfg = replace(full_cfg, rt=replace(full_cfg.rt, seq_len=full_cfg.rt.decode_context_len_effective))
 
         # Prefill
-        ops_p, time_p = collect_all_ops_prefill(cfg)
+        ops_p, time_p = collect_all_ops_prefill(prefill_cfg)
         cat_p = categorize_ops(ops_p)
 
         # Decode (at seq_len)
-        ops_d, time_d = collect_all_ops_decode(cfg)
+        ops_d, time_d = collect_all_ops_decode(decode_cfg)
         cat_d = categorize_ops(ops_d)
 
         # Per-op detail for representative layer (layer 3, C4A)
-        lp = prefill_layer(3, cfg)
+        lp = prefill_layer(3, prefill_cfg)
         per_op_detail = []
         for op in lp.ops:
             per_op_detail.append({
@@ -403,6 +480,10 @@ def run_mhc_optimization_comparison(base_cfg, seq_len, output_len, tp, ep, dp, b
             "mhc_kernel_fused": level["mhc_kernel_fused"],
             "mhc_sp": level["mhc_sp"],
             "mhc_fused_bf16": level["mhc_fused_bf16"],
+            "logical_input_len": full_cfg.rt.request_input_len,
+            "effective_prefill_len": full_cfg.rt.effective_prefill_len,
+            "decode_context_len": full_cfg.rt.decode_context_len_effective,
+            "prefix_cache_hit_rate": prefix_cache_hit_rate,
             "prefill_time_ms": time_p * 1000,
             "decode_step_ms": time_d * 1000,
             "prefill_category_breakdown": cat_p,
@@ -590,7 +671,9 @@ def compute_v3_comparison():
 # KV Cache Scaling
 # ---------------------------------------------------------------------------
 
-KV_SCALING_SEQ_LENS = [1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072]
+KV_SCALING_SEQ_LENS = [
+    1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 1_000_000,
+]
 
 
 def compute_kv_cache_scaling(base_cfg, hw_name):
@@ -659,7 +742,7 @@ def compute_attention_analysis(base_cfg, hw_name):
 
     # --- Per-layer-type KV cache breakdown ---
     layer_type_kv = {}
-    for seq_len in [8192, 32768, 131072]:
+    for seq_len in [8192, 32768, 131072, 262144, 1_000_000]:
         cfg = make_config(base_cfg, tp=4, ep=32, dp=8, batch_size=8,
                           seq_len=seq_len, output_len=4096)
         kv = kv_cache_memory(cfg)
@@ -681,7 +764,7 @@ def compute_attention_analysis(base_cfg, hw_name):
 
     # --- Compressed vs uncompressed comparison ---
     compressed_vs_uncompressed = {}
-    for seq_len in [8192, 32768, 65536, 131072]:
+    for seq_len in [8192, 32768, 65536, 131072, 262144, 1_000_000]:
         cfg = make_config(base_cfg, tp=4, ep=32, dp=8, batch_size=8,
                           seq_len=seq_len, output_len=4096)
         kv = kv_cache_memory(cfg)
@@ -703,7 +786,7 @@ def compute_attention_analysis(base_cfg, hw_name):
 
     # --- Attention compute scaling across seq_len per layer type ---
     attn_scaling = {}
-    for seq_len in [8192, 32768, 131072]:
+    for seq_len in [8192, 32768, 131072, 262144, 1_000_000]:
         cfg = make_config(base_cfg, tp=8, ep=16, dp=2, batch_size=16,
                           seq_len=seq_len, output_len=4096)
 
@@ -791,12 +874,16 @@ def main():
         hw_sp = {}
         hw_mhc = {}
 
-        for combo in COMBOS:
-            combo_name = combo["name"]
+        for combo in iter_result_combos():
+            combo_name = combo["result_name"]
+            base_combo_name = combo["name"]
             seq_len = combo["seq_len"]
             output_len = combo["output_len"]
+            prefix_cache_hit_rate = combo["prefix_cache_hit_rate"]
 
-            print(f"\n  --- Combo: {combo_name} (seq={seq_len}, out={output_len}) ---")
+            print(f"\n  --- Combo: {combo_name} "
+                  f"(base={base_combo_name}, seq={seq_len}, out={output_len}, "
+                  f"hit={prefix_cache_hit_rate:.0%}) ---")
 
             combo_search = {}
 
@@ -807,7 +894,10 @@ def main():
                 gpu_values = PREFILL_GPU_VALUES if phase == "prefill" else DECODE_GPU_VALUES
                 print(f"  [{hw_name}] {combo_name} {key}...")
 
-                results = run_search(base_cfg, phase, seq_len, output_len, hbm_limit, gpu_values)
+                results = run_search(
+                    base_cfg, phase, seq_len, output_len, hbm_limit, gpu_values,
+                    prefix_cache_hit_rate=prefix_cache_hit_rate,
+                )
                 results = sort_results(results, phase, scenario)
                 combo_search[key] = results[:20]  # Keep top 20
 
@@ -849,25 +939,29 @@ def main():
                 g_d = d_best["physical_gpus"]
                 p_tps_gpu = p_best["prefill_tps_per_gpu"]
                 d_tps_gpu = d_best["decode_tps_per_gpu"]
+                p_qps = p_best["prefill_qps_instance"]
+                d_qps = d_best["decode_qps_instance"]
 
-                ratio_float, n_p_ceil = compute_pd_ratio(
-                    p_tps_gpu, g_p, d_tps_gpu, g_d, seq_len, output_len)
+                ratio_float, n_p_ceil = compute_pd_ratio(p_qps, d_qps)
 
                 pd_info = {
                     "prefill_config": {
                         "tp": p_best["tp"], "ep": p_best["ep"], "dp": p_best["dp"],
                         "batch_size": p_best["batch_size"],
                         "gpus": g_p, "tps_per_gpu": round(p_tps_gpu, 2),
-                        "tps_instance": round(p_tps_gpu * g_p, 2),
+                        "tps_instance": round(p_best["prefill_tps_instance"], 2),
+                        "qps_instance": round(p_qps, 4),
                     },
                     "decode_config": {
                         "tp": d_best["tp"], "ep": d_best["ep"], "dp": d_best["dp"],
                         "batch_size": d_best["batch_size"],
                         "gpus": g_d, "tps_per_gpu": round(d_tps_gpu, 2),
-                        "tps_instance": round(d_tps_gpu * g_d, 2),
+                        "tps_instance": round(d_best["decode_tps_instance"], 2),
+                        "qps_instance": round(d_qps, 4),
                     },
                     "input_len": seq_len,
                     "output_len": output_len,
+                    "prefix_cache_hit_rate": p_best.get("prefix_cache_hit_rate", 0.0),
                     "pd_ratio_float": round(ratio_float, 3),
                     "pd_ratio_ceil": n_p_ceil,
                     "total_gpus_min": n_p_ceil * g_p + 1 * g_d,
@@ -884,9 +978,12 @@ def main():
             # --- Op Analysis (use best throughput config for detailed analysis) ---
             if p_throughput:
                 best_p = p_throughput[0]
-                cfg_p = make_config(base_cfg, tp=best_p["tp"], ep=best_p["ep"],
-                                    dp=best_p["dp"], batch_size=best_p["batch_size"],
-                                    seq_len=seq_len, output_len=output_len)
+                _, cfg_p = make_phase_configs(
+                    base_cfg, phase="prefill",
+                    tp=best_p["tp"], ep=best_p["ep"], dp=best_p["dp"],
+                    batch_size=best_p["batch_size"], seq_len=seq_len,
+                    output_len=output_len, prefix_cache_hit_rate=prefix_cache_hit_rate,
+                )
                 ops_p, time_p = collect_all_ops_prefill(cfg_p)
                 cat_p = categorize_ops(ops_p)
             else:
@@ -894,9 +991,12 @@ def main():
 
             if d_throughput:
                 best_d = d_throughput[0]
-                cfg_d = make_config(base_cfg, tp=best_d["tp"], ep=best_d["ep"],
-                                    dp=best_d["dp"], batch_size=best_d["batch_size"],
-                                    seq_len=seq_len, output_len=output_len)
+                _, cfg_d = make_phase_configs(
+                    base_cfg, phase="decode",
+                    tp=best_d["tp"], ep=best_d["ep"], dp=best_d["dp"],
+                    batch_size=best_d["batch_size"], seq_len=seq_len,
+                    output_len=output_len, prefix_cache_hit_rate=prefix_cache_hit_rate,
+                )
                 ops_d, time_d = collect_all_ops_decode(cfg_d)
                 cat_d = categorize_ops(ops_d)
             else:
@@ -911,15 +1011,18 @@ def main():
         print(f"\n  --- SP / mHC-SP Comparison ({hw_name}) ---")
         # Use a moderate config for SP comparison
         sp_tp, sp_ep, sp_dp, sp_bs = 8, 16, 2, 16
-        for combo in COMBOS:
-            combo_name = combo["name"]
+        for combo in iter_result_combos():
+            combo_name = combo["result_name"]
             seq_len = combo["seq_len"]
             output_len = combo["output_len"]
+            prefix_cache_hit_rate = combo["prefix_cache_hit_rate"]
 
             # Check memory first
             cfg_test = make_config(base_cfg, tp=sp_tp, ep=sp_ep, dp=sp_dp,
                                    batch_size=sp_bs, seq_len=seq_len,
-                                   output_len=output_len)
+                                   output_len=output_len, input_len=seq_len,
+                                   decode_context_len=seq_len,
+                                   prefix_cache_hit_rate=prefix_cache_hit_rate)
             _, _, total_gb, fits = check_memory(cfg_test, hbm_limit)
 
             if not fits:
@@ -927,65 +1030,82 @@ def main():
                 for smaller_bs in [8, 4, 2, 1]:
                     cfg_test = make_config(base_cfg, tp=sp_tp, ep=sp_ep, dp=sp_dp,
                                            batch_size=smaller_bs * sp_dp, seq_len=seq_len,
-                                           output_len=output_len)
+                                           output_len=output_len, input_len=seq_len,
+                                           decode_context_len=seq_len,
+                                           prefix_cache_hit_rate=prefix_cache_hit_rate)
                     _, _, total_gb, fits = check_memory(cfg_test, hbm_limit)
                     if fits:
                         sp_bs_actual = smaller_bs * sp_dp
                         break
                 else:
                     print(f"    {combo_name}: Cannot fit in memory for SP comparison, skipping")
-                    hw_sp[combo_name] = {"error": "OOM"}
+                    hw_sp[combo_name] = {
+                        "error": "OOM",
+                        "prefix_cache_hit_rate": prefix_cache_hit_rate,
+                    }
                     continue
             else:
                 sp_bs_actual = sp_bs
 
             sp_result = run_sp_comparison(base_cfg, seq_len, output_len,
-                                          sp_tp, sp_ep, sp_dp, sp_bs_actual)
+                                          sp_tp, sp_ep, sp_dp, sp_bs_actual,
+                                          prefix_cache_hit_rate=prefix_cache_hit_rate)
             hw_sp[combo_name] = sp_result
-            print(f"    {combo_name}: no_SP={sp_result['no_SP']['prefill_time_ms']:.1f}ms, "
+            print(f"    {combo_name} hit={prefix_cache_hit_rate:.0%}: "
+                  f"no_SP={sp_result['no_SP']['prefill_time_ms']:.1f}ms, "
                   f"SP={sp_result['SP_only']['prefill_time_ms']:.1f}ms, "
                   f"SP+mHC_SP={sp_result['SP_mHC_SP']['prefill_time_ms']:.1f}ms")
 
         # --- mHC Optimization Comparison ---
         print(f"\n  --- mHC Optimization Comparison ({hw_name}) ---")
         mhc_tp, mhc_ep, mhc_dp, mhc_bs = 8, 16, 2, 16
-        for combo in COMBOS:
-            combo_name = combo["name"]
+        for combo in iter_result_combos():
+            combo_name = combo["result_name"]
             seq_len = combo["seq_len"]
             output_len = combo["output_len"]
+            prefix_cache_hit_rate = combo["prefix_cache_hit_rate"]
 
             # Check memory first (use unfused FP32 — largest weight footprint is same)
             cfg_test = make_config(base_cfg, tp=mhc_tp, ep=mhc_ep, dp=mhc_dp,
                                    batch_size=mhc_bs, seq_len=seq_len,
-                                   output_len=output_len)
+                                   output_len=output_len, input_len=seq_len,
+                                   decode_context_len=seq_len,
+                                   prefix_cache_hit_rate=prefix_cache_hit_rate)
             _, _, total_gb, fits = check_memory(cfg_test, hbm_limit)
 
             if not fits:
                 for smaller_bs in [8, 4, 2, 1]:
                     cfg_test = make_config(base_cfg, tp=mhc_tp, ep=mhc_ep, dp=mhc_dp,
                                            batch_size=smaller_bs * mhc_dp, seq_len=seq_len,
-                                           output_len=output_len)
+                                           output_len=output_len, input_len=seq_len,
+                                           decode_context_len=seq_len,
+                                           prefix_cache_hit_rate=prefix_cache_hit_rate)
                     _, _, total_gb, fits = check_memory(cfg_test, hbm_limit)
                     if fits:
                         mhc_bs_actual = smaller_bs * mhc_dp
                         break
                 else:
                     print(f"    {combo_name}: Cannot fit in memory for mHC comparison, skipping")
-                    hw_mhc[combo_name] = {"error": "OOM"}
+                    hw_mhc[combo_name] = {
+                        "error": "OOM",
+                        "prefix_cache_hit_rate": prefix_cache_hit_rate,
+                    }
                     continue
             else:
                 mhc_bs_actual = mhc_bs
 
             mhc_result = run_mhc_optimization_comparison(
                 base_cfg, seq_len, output_len,
-                mhc_tp, mhc_ep, mhc_dp, mhc_bs_actual)
+                mhc_tp, mhc_ep, mhc_dp, mhc_bs_actual,
+                prefix_cache_hit_rate=prefix_cache_hit_rate)
             hw_mhc[combo_name] = mhc_result
 
             uf = mhc_result["unfused_fp32"]["prefill_time_ms"]
             ff = mhc_result["fused_fp32"]["prefill_time_ms"]
             fs = mhc_result["fused_fp32_sp"]["prefill_time_ms"]
             fb = mhc_result["fused_bf16_sp"]["prefill_time_ms"]
-            print(f"    {combo_name}: unfused={uf:.1f}ms, fused={ff:.1f}ms, "
+            print(f"    {combo_name} hit={prefix_cache_hit_rate:.0%}: "
+                  f"unfused={uf:.1f}ms, fused={ff:.1f}ms, "
                   f"fused+SP={fs:.1f}ms, fused_bf16+SP={fb:.1f}ms "
                   f"(speedup: {uf/fb:.2f}x)")
 
@@ -1045,8 +1165,8 @@ def main():
     print(f"{'='*70}")
 
     hw_comparison = {}
-    for combo in COMBOS:
-        cn = combo["name"]
+    for combo in iter_result_combos():
+        cn = combo["result_name"]
         comp = {}
         for phase_sc in ["prefill_latency", "prefill_throughput",
                          "decode_latency", "decode_throughput"]:
@@ -1091,8 +1211,8 @@ def main():
 
     for hw_name in ["910C", "H20"]:
         print(f"\n  {hw_name}:")
-        for combo in COMBOS:
-            cn = combo["name"]
+        for combo in iter_result_combos():
+            cn = combo["result_name"]
             search = all_search_results.get(hw_name, {}).get(cn, {})
             pd = all_pd_results.get(hw_name, {}).get(cn, {})
 

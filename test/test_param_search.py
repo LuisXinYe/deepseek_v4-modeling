@@ -6,6 +6,7 @@ from unittest.mock import patch
 from test.helpers import make_config
 from param_search import analyze as search_analyze
 from param_search import search
+from report import analyze_scenarios
 
 
 class TestSearchHelpers(unittest.TestCase):
@@ -119,6 +120,38 @@ class TestSearchAnalyze(unittest.TestCase):
         analysis = search_analyze.analyze_decode_throughput(rows)
         self.assertEqual(analysis["best"]["prefix_cache_hit_rate"], 0.0)
         self.assertTrue(all("prefix_cache_hit_rate" in row for row in analysis["batch_scaling"]))
+
+
+class TestScenarioAnalysis(unittest.TestCase):
+    def test_compute_pd_ratio_uses_instance_qps(self):
+        ratio, rounded = analyze_scenarios.compute_pd_ratio(
+            p_qps_instance=100.0,
+            d_qps_instance=250.0,
+        )
+        self.assertEqual(ratio, 2.5)
+        self.assertEqual(rounded, 3)
+
+    def test_combos_include_1m_4k(self):
+        names = {combo["name"] for combo in analyze_scenarios.COMBOS}
+        self.assertIn("1M_4K", names)
+
+    def test_hit_rate_values_are_defined(self):
+        self.assertEqual(analyze_scenarios.PREFIX_CACHE_HIT_RATE_VALUES, [0.0, 0.9, 0.99])
+
+    def test_report_gpu_values_are_power_of_two_request_set(self):
+        self.assertEqual(analyze_scenarios.PREFILL_GPU_VALUES, [8, 16, 32, 64])
+        self.assertEqual(analyze_scenarios.DECODE_GPU_VALUES, [8, 16, 32, 64])
+
+    def test_iter_result_combos_expands_all_prefix_cache_rates(self):
+        combos = list(analyze_scenarios.iter_result_combos())
+        names = {combo["result_name"] for combo in combos}
+        self.assertEqual(
+            len(combos),
+            len(analyze_scenarios.COMBOS) * len(analyze_scenarios.PREFIX_CACHE_HIT_RATE_VALUES),
+        )
+        self.assertIn("8K_4K", names)
+        self.assertIn("8K_4K_hit90", names)
+        self.assertIn("1M_4K_hit99", names)
 
 
 if __name__ == "__main__":
