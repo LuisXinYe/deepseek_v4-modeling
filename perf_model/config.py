@@ -15,6 +15,7 @@ class HardwareConfig:
     hbm_bandwidth_gbps: float = 1800
     flops_utilization: float = 0.5
     hbm_bw_utilization: float = 0.8
+    w8a8_tflops: float | None = None
 
     @property
     def usable_hbm_capacity_gb(self) -> float:
@@ -22,6 +23,10 @@ class HardwareConfig:
         if self.hbm_reserved_pct < 0 or self.hbm_reserved_pct >= 100:
             raise ValueError("hbm_reserved_pct must be in [0, 100)")
         return self.hbm_capacity_gb * (1 - self.hbm_reserved_pct / 100)
+
+    @property
+    def effective_w8a8_tflops(self) -> float:
+        return self.w8a8_tflops if self.w8a8_tflops is not None else self.cube_tflops * 2
 
 
 @dataclass
@@ -105,6 +110,12 @@ class RuntimeConfig:
     input_len: int | None = None
     decode_context_len: int | None = None
     prefix_cache_hit_rate: float = 0.0
+    mtp: int = 0
+    mtp_accept_ratio: float = 1.0
+    quant_mode: str = "bf16"
+    kv_cache_quant_mode: str = "bf16"
+    weight_scale_overhead_bytes: float = 0.0
+    kv_scale_overhead_bytes: float = 0.0
 
     @property
     def request_input_len(self) -> int:
@@ -120,6 +131,16 @@ class RuntimeConfig:
     @property
     def decode_context_len_effective(self) -> int:
         return self.decode_context_len if self.decode_context_len is not None else self.request_input_len
+
+    def validate_serving_fields(self) -> None:
+        if self.mtp < 0:
+            raise ValueError("mtp must be >= 0")
+        if not 0 <= self.mtp_accept_ratio <= 1:
+            raise ValueError("mtp_accept_ratio must be in [0, 1]")
+        if self.quant_mode not in {"bf16", "w8a8"}:
+            raise ValueError("quant_mode must be 'bf16' or 'w8a8'")
+        if self.kv_cache_quant_mode not in {"bf16", "kv8", "kv4"}:
+            raise ValueError("kv_cache_quant_mode must be 'bf16', 'kv8', or 'kv4'")
 
 
 @dataclass

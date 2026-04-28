@@ -30,6 +30,11 @@ class TestHardwareConfig(unittest.TestCase):
         self.assertEqual(hw.flops_utilization, 0.5)
         self.assertEqual(hw.hbm_bw_utilization, 0.8)
 
+    def test_hardware_w8a8_default(self):
+        hw = HardwareConfig()
+        self.assertIsNone(hw.w8a8_tflops)
+        self.assertEqual(hw.effective_w8a8_tflops, hw.cube_tflops * 2)
+
     def test_custom_values(self):
         hw = HardwareConfig(
             cube_tflops=500,
@@ -118,6 +123,13 @@ class TestRuntimeConfig(unittest.TestCase):
         self.assertIsNone(rt.input_len)
         self.assertIsNone(rt.decode_context_len)
         self.assertEqual(rt.prefix_cache_hit_rate, 0.0)
+
+    def test_quant_and_mtp_defaults(self):
+        rt = RuntimeConfig()
+        self.assertEqual(rt.mtp, 0)
+        self.assertEqual(rt.mtp_accept_ratio, 1.0)
+        self.assertEqual(rt.quant_mode, "bf16")
+        self.assertEqual(rt.kv_cache_quant_mode, "bf16")
 
     def test_helper_semantics(self):
         rt = RuntimeConfig(
@@ -235,7 +247,10 @@ class TestConfigFromJson(unittest.TestCase):
                            "mhc_sp": True, "mhc_kernel_fused": False,
                            "mhc_fused_bf16": False,
                            "input_len": 48, "decode_context_len": 32,
-                           "prefix_cache_hit_rate": 0.25}, f)
+                           "prefix_cache_hit_rate": 0.25,
+                           "mtp": 1, "mtp_accept_ratio": 0.9,
+                           "quant_mode": "w8a8",
+                           "kv_cache_quant_mode": "kv8"}, f)
 
             cfg = Config.from_json(hw_path, net_path, model_path, rt_path)
 
@@ -255,6 +270,10 @@ class TestConfigFromJson(unittest.TestCase):
             self.assertFalse(cfg.rt.shared_expert_overlapped)
             self.assertTrue(cfg.rt.mhc_sp)
             self.assertFalse(cfg.rt.mhc_kernel_fused)
+            self.assertEqual(cfg.rt.mtp, 1)
+            self.assertEqual(cfg.rt.mtp_accept_ratio, 0.9)
+            self.assertEqual(cfg.rt.quant_mode, "w8a8")
+            self.assertEqual(cfg.rt.kv_cache_quant_mode, "kv8")
 
 
 class TestMakeConfig(unittest.TestCase):

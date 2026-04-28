@@ -52,6 +52,7 @@ def make_config(**overrides) -> Config:
         hbm_bandwidth_gbps=1800,
         flops_utilization=0.5,
         hbm_bw_utilization=0.8,
+        w8a8_tflops=None,
     )
     hw_defaults.update(hw_overrides)
 
@@ -103,6 +104,12 @@ def make_config(**overrides) -> Config:
         input_len=None,
         decode_context_len=None,
         prefix_cache_hit_rate=0.0,
+        mtp=0,
+        mtp_accept_ratio=1.0,
+        quant_mode="bf16",
+        kv_cache_quant_mode="bf16",
+        weight_scale_overhead_bytes=0.0,
+        kv_scale_overhead_bytes=0.0,
     )
     rt_defaults.update(rt_overrides)
 
