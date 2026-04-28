@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from test.helpers import make_config
+from param_search import analyze as search_analyze
 from param_search import search
 
 
@@ -90,6 +91,34 @@ class TestSearchMatrix(unittest.TestCase):
             cfg.rt.output_len,
             places=2,
         )
+
+
+class TestSearchAnalyze(unittest.TestCase):
+    def test_prefill_latency_best_per_group_uses_hit_rate_dimension(self):
+        rows = [
+            {"seq_len": 1024, "prefix_cache_hit_rate": 0.0, "prefill_time_ms": 10.0},
+            {"seq_len": 1024, "prefix_cache_hit_rate": 0.9, "prefill_time_ms": 2.0},
+        ]
+        analysis = search_analyze.analyze_prefill_latency(rows)
+        self.assertIn((1024, 0.0), analysis["best_per_group"])
+        self.assertIn((1024, 0.9), analysis["best_per_group"])
+
+    def test_decode_throughput_batch_scaling_keeps_hit_rate_partition(self):
+        rows = [
+            {
+                "tp": 2, "ep": 4, "dp": 4, "seq_len": 1024,
+                "prefix_cache_hit_rate": 0.0, "batch_size": 8,
+                "physical_gpus": 8, "decode_tps_per_gpu": 10.0,
+            },
+            {
+                "tp": 2, "ep": 4, "dp": 4, "seq_len": 1024,
+                "prefix_cache_hit_rate": 0.9, "batch_size": 8,
+                "physical_gpus": 8, "decode_tps_per_gpu": 9.0,
+            },
+        ]
+        analysis = search_analyze.analyze_decode_throughput(rows)
+        self.assertEqual(analysis["best"]["prefix_cache_hit_rate"], 0.0)
+        self.assertTrue(all("prefix_cache_hit_rate" in row for row in analysis["batch_scaling"]))
 
 
 if __name__ == "__main__":

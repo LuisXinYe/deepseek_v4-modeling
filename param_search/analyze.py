@@ -75,6 +75,16 @@ def fmt_num(v, decimals=1):
     return str(v)
 
 
+def hit_rate(row):
+    """Return prefix-cache hit rate, defaulting old CSV rows to 0."""
+    return row.get("prefix_cache_hit_rate", 0.0)
+
+
+def group_key(row):
+    """Analysis grouping key for sequence length plus prefix-cache hit rate."""
+    return (row["seq_len"], hit_rate(row))
+
+
 # ---------------------------------------------------------------------------
 # Per-scenario analysis
 # ---------------------------------------------------------------------------
@@ -87,24 +97,27 @@ def analyze_prefill_latency(results):
 
     analysis["best"] = results[0]
 
-    # Best per seq_len
-    best_per_seq = {}
+    # Best per seq_len and prefix-cache hit rate
+    best_per_group = {}
     for r in results:
-        sl = r["seq_len"]
+        key = group_key(r)
         metric = r["prefill_time_ms"]
-        if sl not in best_per_seq or metric < best_per_seq[sl]["prefill_time_ms"]:
-            best_per_seq[sl] = r
-    analysis["best_per_seq"] = best_per_seq
+        if key not in best_per_group or metric < best_per_group[key]["prefill_time_ms"]:
+            best_per_group[key] = r
+    analysis["best_per_group"] = best_per_group
 
     # SP impact
     sp_impact = {}
-    for sl in sorted(best_per_seq.keys()):
-        sp_true = [r for r in results if r["seq_len"] == sl and r["sp"] is True]
-        sp_false = [r for r in results if r["seq_len"] == sl and r["sp"] is False]
+    for key in sorted(best_per_group.keys()):
+        sl, hr = key
+        sp_true = [r for r in results if group_key(r) == key and r.get("sp") is True]
+        sp_false = [r for r in results if group_key(r) == key and r.get("sp") is False]
         if sp_true and sp_false:
             best_true = min(sp_true, key=lambda r: r["prefill_time_ms"])
             best_false = min(sp_false, key=lambda r: r["prefill_time_ms"])
-            sp_impact[sl] = {
+            sp_impact[key] = {
+                "seq_len": sl,
+                "prefix_cache_hit_rate": hr,
                 "sp_true_ms": best_true["prefill_time_ms"],
                 "sp_false_ms": best_false["prefill_time_ms"],
                 "speedup": best_false["prefill_time_ms"] / best_true["prefill_time_ms"]
@@ -122,23 +135,26 @@ def analyze_decode_latency(results):
 
     analysis["best"] = results[0]
 
-    best_per_seq = {}
+    best_per_group = {}
     for r in results:
-        sl = r["seq_len"]
+        key = group_key(r)
         metric = r["decode_first_step_ms"]
-        if sl not in best_per_seq or metric < best_per_seq[sl]["decode_first_step_ms"]:
-            best_per_seq[sl] = r
-    analysis["best_per_seq"] = best_per_seq
+        if key not in best_per_group or metric < best_per_group[key]["decode_first_step_ms"]:
+            best_per_group[key] = r
+    analysis["best_per_group"] = best_per_group
 
     # SP impact on decode
     sp_impact = {}
-    for sl in sorted(best_per_seq.keys()):
-        sp_true = [r for r in results if r["seq_len"] == sl and r["sp"] is True]
-        sp_false = [r for r in results if r["seq_len"] == sl and r["sp"] is False]
+    for key in sorted(best_per_group.keys()):
+        sl, hr = key
+        sp_true = [r for r in results if group_key(r) == key and r.get("sp") is True]
+        sp_false = [r for r in results if group_key(r) == key and r.get("sp") is False]
         if sp_true and sp_false:
             best_true = min(sp_true, key=lambda r: r["decode_first_step_ms"])
             best_false = min(sp_false, key=lambda r: r["decode_first_step_ms"])
-            sp_impact[sl] = {
+            sp_impact[key] = {
+                "seq_len": sl,
+                "prefix_cache_hit_rate": hr,
                 "sp_true_ms": best_true["decode_first_step_ms"],
                 "sp_false_ms": best_false["decode_first_step_ms"],
                 "speedup": best_false["decode_first_step_ms"] / best_true["decode_first_step_ms"]
@@ -159,7 +175,7 @@ def analyze_prefill_throughput(results):
     # Best per GPU count
     best_per_gpu = {}
     for r in results:
-        gpus = r["physical_gpus"]
+        gpus = (r["physical_gpus"], hit_rate(r))
         metric = r["prefill_tps_per_gpu"]
         if gpus not in best_per_gpu or metric > best_per_gpu[gpus]["prefill_tps_per_gpu"]:
             best_per_gpu[gpus] = r
@@ -170,7 +186,8 @@ def analyze_prefill_throughput(results):
         b = results[0]
         batch_scaling = [r for r in results
                          if r["tp"] == b["tp"] and r["ep"] == b["ep"]
-                         and r["dp"] == b["dp"] and r["seq_len"] == b["seq_len"]]
+                         and r["dp"] == b["dp"] and r["seq_len"] == b["seq_len"]
+                         and hit_rate(r) == hit_rate(b)]
         batch_scaling.sort(key=lambda r: r["batch_size"])
         analysis["batch_scaling"] = batch_scaling
 
@@ -187,7 +204,7 @@ def analyze_decode_throughput(results):
 
     best_per_gpu = {}
     for r in results:
-        gpus = r["physical_gpus"]
+        gpus = (r["physical_gpus"], hit_rate(r))
         metric = r["decode_tps_per_gpu"]
         if gpus not in best_per_gpu or metric > best_per_gpu[gpus]["decode_tps_per_gpu"]:
             best_per_gpu[gpus] = r
@@ -198,7 +215,8 @@ def analyze_decode_throughput(results):
         b = results[0]
         batch_scaling = [r for r in results
                          if r["tp"] == b["tp"] and r["ep"] == b["ep"]
-                         and r["dp"] == b["dp"] and r["seq_len"] == b["seq_len"]]
+                         and r["dp"] == b["dp"] and r["seq_len"] == b["seq_len"]
+                         and hit_rate(r) == hit_rate(b)]
         batch_scaling.sort(key=lambda r: r["batch_size"])
         analysis["batch_scaling"] = batch_scaling
 
@@ -239,27 +257,28 @@ def generate_markdown_report(results_dir, all_results, all_analyses, meta):
 
     if pf_lat:
         lines.append("### Top-10 Configurations\n")
-        headers = ["Rank", "TP", "EP", "DP", "EDP", "BS", "SeqLen", "SP", "Overlap",
+        headers = ["Rank", "TP", "EP", "DP", "EDP", "BS", "SeqLen", "HitRate", "SP", "Overlap",
                     "GPUs", "Prefill(ms)", "HBM(GB)"]
         rows = []
         for i, r in enumerate(pf_lat[:10]):
             rows.append([
                 i + 1, r["tp"], r["ep"], r["dp"], r["edp"],
-                r["batch_size"], r["seq_len"], r["sp"], r["shared_expert_overlapped"],
+                r["batch_size"], r["seq_len"], fmt_num(hit_rate(r), 2),
+                r["sp"], r["shared_expert_overlapped"],
                 r["physical_gpus"], fmt_num(r["prefill_time_ms"]),
                 fmt_num(r["hbm_total_gb"]),
             ])
         lines.append(md_table(headers, rows))
         lines.append("")
 
-    if pf_lat_a.get("best_per_seq"):
-        lines.append("### Best Config per Sequence Length\n")
-        headers = ["SeqLen", "TP", "EP", "DP", "EDP", "BS", "SP", "GPUs", "Prefill(ms)"]
+    if pf_lat_a.get("best_per_group"):
+        lines.append("### Best Config per Sequence Length / Prefix Cache Hit Rate\n")
+        headers = ["SeqLen", "HitRate", "TP", "EP", "DP", "EDP", "BS", "SP", "GPUs", "Prefill(ms)"]
         rows = []
-        for sl in sorted(pf_lat_a["best_per_seq"].keys()):
-            r = pf_lat_a["best_per_seq"][sl]
+        for sl, hr in sorted(pf_lat_a["best_per_group"].keys()):
+            r = pf_lat_a["best_per_group"][(sl, hr)]
             rows.append([
-                sl, r["tp"], r["ep"], r["dp"], r["edp"],
+                sl, fmt_num(hr, 2), r["tp"], r["ep"], r["dp"], r["edp"],
                 r["batch_size"], r["sp"], r["physical_gpus"],
                 fmt_num(r["prefill_time_ms"]),
             ])
@@ -268,12 +287,12 @@ def generate_markdown_report(results_dir, all_results, all_analyses, meta):
 
     if pf_lat_a.get("sp_impact"):
         lines.append("### Sequence Parallelism Impact on Prefill\n")
-        headers = ["SeqLen", "SP=True(ms)", "SP=False(ms)", "Speedup"]
+        headers = ["SeqLen", "HitRate", "SP=True(ms)", "SP=False(ms)", "Speedup"]
         rows = []
-        for sl in sorted(pf_lat_a["sp_impact"].keys()):
-            imp = pf_lat_a["sp_impact"][sl]
+        for sl, hr in sorted(pf_lat_a["sp_impact"].keys()):
+            imp = pf_lat_a["sp_impact"][(sl, hr)]
             rows.append([
-                sl, fmt_num(imp["sp_true_ms"]),
+                sl, fmt_num(hr, 2), fmt_num(imp["sp_true_ms"]),
                 fmt_num(imp["sp_false_ms"]),
                 f"{imp['speedup']:.2f}x",
             ])
@@ -287,27 +306,28 @@ def generate_markdown_report(results_dir, all_results, all_analyses, meta):
 
     if dc_lat:
         lines.append("### Top-10 Configurations\n")
-        headers = ["Rank", "TP", "EP", "DP", "EDP", "BS", "SeqLen", "SP", "Overlap",
+        headers = ["Rank", "TP", "EP", "DP", "EDP", "BS", "SeqLen", "HitRate", "SP", "Overlap",
                     "GPUs", "1st Step(ms)", "HBM(GB)"]
         rows = []
         for i, r in enumerate(dc_lat[:10]):
             rows.append([
                 i + 1, r["tp"], r["ep"], r["dp"], r["edp"],
-                r["batch_size"], r["seq_len"], r["sp"], r["shared_expert_overlapped"],
+                r["batch_size"], r["seq_len"], fmt_num(hit_rate(r), 2),
+                r["sp"], r["shared_expert_overlapped"],
                 r["physical_gpus"], fmt_num(r["decode_first_step_ms"], 3),
                 fmt_num(r["hbm_total_gb"]),
             ])
         lines.append(md_table(headers, rows))
         lines.append("")
 
-    if dc_lat_a.get("best_per_seq"):
-        lines.append("### Best Config per Sequence Length\n")
-        headers = ["SeqLen", "TP", "EP", "DP", "EDP", "BS", "SP", "GPUs", "1st Step(ms)"]
+    if dc_lat_a.get("best_per_group"):
+        lines.append("### Best Config per Sequence Length / Prefix Cache Hit Rate\n")
+        headers = ["SeqLen", "HitRate", "TP", "EP", "DP", "EDP", "BS", "SP", "GPUs", "1st Step(ms)"]
         rows = []
-        for sl in sorted(dc_lat_a["best_per_seq"].keys()):
-            r = dc_lat_a["best_per_seq"][sl]
+        for sl, hr in sorted(dc_lat_a["best_per_group"].keys()):
+            r = dc_lat_a["best_per_group"][(sl, hr)]
             rows.append([
-                sl, r["tp"], r["ep"], r["dp"], r["edp"],
+                sl, fmt_num(hr, 2), r["tp"], r["ep"], r["dp"], r["edp"],
                 r["batch_size"], r["sp"], r["physical_gpus"],
                 fmt_num(r["decode_first_step_ms"], 3),
             ])
@@ -316,12 +336,12 @@ def generate_markdown_report(results_dir, all_results, all_analyses, meta):
 
     if dc_lat_a.get("sp_impact"):
         lines.append("### Sequence Parallelism Impact on Decode\n")
-        headers = ["SeqLen", "SP=True(ms)", "SP=False(ms)", "Speedup"]
+        headers = ["SeqLen", "HitRate", "SP=True(ms)", "SP=False(ms)", "Speedup"]
         rows = []
-        for sl in sorted(dc_lat_a["sp_impact"].keys()):
-            imp = dc_lat_a["sp_impact"][sl]
+        for sl, hr in sorted(dc_lat_a["sp_impact"].keys()):
+            imp = dc_lat_a["sp_impact"][(sl, hr)]
             rows.append([
-                sl, fmt_num(imp["sp_true_ms"], 3),
+                sl, fmt_num(hr, 2), fmt_num(imp["sp_true_ms"], 3),
                 fmt_num(imp["sp_false_ms"], 3),
                 f"{imp['speedup']:.2f}x",
             ])
@@ -335,13 +355,13 @@ def generate_markdown_report(results_dir, all_results, all_analyses, meta):
 
     if pf_thr:
         lines.append("### Top-10 Configurations\n")
-        headers = ["Rank", "TP", "EP", "DP", "EDP", "BS", "SeqLen",
+        headers = ["Rank", "TP", "EP", "DP", "EDP", "BS", "SeqLen", "HitRate",
                     "GPUs", "TPS/GPU", "HBM(GB)"]
         rows = []
         for i, r in enumerate(pf_thr[:10]):
             rows.append([
                 i + 1, r["tp"], r["ep"], r["dp"], r["edp"],
-                r["batch_size"], r["seq_len"], r["physical_gpus"],
+                r["batch_size"], r["seq_len"], fmt_num(hit_rate(r), 2), r["physical_gpus"],
                 fmt_num(r["prefill_tps_per_gpu"], 2),
                 fmt_num(r["hbm_total_gb"]),
             ])
@@ -350,12 +370,12 @@ def generate_markdown_report(results_dir, all_results, all_analyses, meta):
 
     if pf_thr_a.get("best_per_gpu"):
         lines.append("### Best Config per GPU Count\n")
-        headers = ["GPUs", "TP", "EP", "DP", "EDP", "BS", "SeqLen", "TPS/GPU"]
+        headers = ["GPUs", "HitRate", "TP", "EP", "DP", "EDP", "BS", "SeqLen", "TPS/GPU"]
         rows = []
-        for gpus in sorted(pf_thr_a["best_per_gpu"].keys()):
-            r = pf_thr_a["best_per_gpu"][gpus]
+        for gpus, hr in sorted(pf_thr_a["best_per_gpu"].keys()):
+            r = pf_thr_a["best_per_gpu"][(gpus, hr)]
             rows.append([
-                gpus, r["tp"], r["ep"], r["dp"], r["edp"],
+                gpus, fmt_num(hr, 2), r["tp"], r["ep"], r["dp"], r["edp"],
                 r["batch_size"], r["seq_len"],
                 fmt_num(r["prefill_tps_per_gpu"], 2),
             ])
@@ -382,7 +402,7 @@ def generate_markdown_report(results_dir, all_results, all_analyses, meta):
 
     if dc_thr:
         lines.append("### Top-10 Configurations\n")
-        headers = ["Rank", "TP", "EP", "DP", "EDP", "BS", "SeqLen",
+        headers = ["Rank", "TP", "EP", "DP", "EDP", "BS", "SeqLen", "HitRate",
                     "GPUs", "TPS/GPU", "Exact TPS/GPU", "Err%", "HBM(GB)"]
         rows = []
         for i, r in enumerate(dc_thr[:10]):
@@ -390,7 +410,7 @@ def generate_markdown_report(results_dir, all_results, all_analyses, meta):
             err = r.get("approx_error_pct", "")
             rows.append([
                 i + 1, r["tp"], r["ep"], r["dp"], r["edp"],
-                r["batch_size"], r["seq_len"], r["physical_gpus"],
+                r["batch_size"], r["seq_len"], fmt_num(hit_rate(r), 2), r["physical_gpus"],
                 fmt_num(r["decode_tps_per_gpu"], 2) if isinstance(r.get("decode_tps_per_gpu"), (int, float)) else r.get("decode_tps_per_gpu", "-"),
                 fmt_num(r.get("decode_tps_per_gpu"), 2) if r.get("approx_error_pct", "") != "" else "-",
                 fmt_num(err) if err != "" else "-",
@@ -401,12 +421,12 @@ def generate_markdown_report(results_dir, all_results, all_analyses, meta):
 
     if dc_thr_a.get("best_per_gpu"):
         lines.append("### Best Config per GPU Count\n")
-        headers = ["GPUs", "TP", "EP", "DP", "EDP", "BS", "SeqLen", "TPS/GPU"]
+        headers = ["GPUs", "HitRate", "TP", "EP", "DP", "EDP", "BS", "SeqLen", "TPS/GPU"]
         rows = []
-        for gpus in sorted(dc_thr_a["best_per_gpu"].keys()):
-            r = dc_thr_a["best_per_gpu"][gpus]
+        for gpus, hr in sorted(dc_thr_a["best_per_gpu"].keys()):
+            r = dc_thr_a["best_per_gpu"][(gpus, hr)]
             rows.append([
-                gpus, r["tp"], r["ep"], r["dp"], r["edp"],
+                gpus, fmt_num(hr, 2), r["tp"], r["ep"], r["dp"], r["edp"],
                 r["batch_size"], r["seq_len"],
                 fmt_num(r["decode_tps_per_gpu"], 2),
             ])
@@ -460,27 +480,28 @@ def generate_markdown_report_zh(results_dir, all_results, all_analyses, meta):
 
     if pf_lat:
         lines.append("### 前10最优配置\n")
-        headers = ["排名", "TP", "EP", "DP", "EDP", "BS", "序列长度", "SP", "重叠",
+        headers = ["排名", "TP", "EP", "DP", "EDP", "BS", "序列长度", "命中率", "SP", "重叠",
                     "GPU数", "预填充(ms)", "HBM(GB)"]
         rows = []
         for i, r in enumerate(pf_lat[:10]):
             rows.append([
                 i + 1, r["tp"], r["ep"], r["dp"], r["edp"],
-                r["batch_size"], r["seq_len"], r["sp"], r["shared_expert_overlapped"],
+                r["batch_size"], r["seq_len"], fmt_num(hit_rate(r), 2),
+                r["sp"], r["shared_expert_overlapped"],
                 r["physical_gpus"], fmt_num(r["prefill_time_ms"]),
                 fmt_num(r["hbm_total_gb"]),
             ])
         lines.append(md_table(headers, rows))
         lines.append("")
 
-    if pf_lat_a.get("best_per_seq"):
-        lines.append("### 各序列长度最优配置\n")
-        headers = ["序列长度", "TP", "EP", "DP", "EDP", "BS", "SP", "GPU数", "预填充(ms)"]
+    if pf_lat_a.get("best_per_group"):
+        lines.append("### 各序列长度 / Prefix Cache 命中率最优配置\n")
+        headers = ["序列长度", "命中率", "TP", "EP", "DP", "EDP", "BS", "SP", "GPU数", "预填充(ms)"]
         rows = []
-        for sl in sorted(pf_lat_a["best_per_seq"].keys()):
-            r = pf_lat_a["best_per_seq"][sl]
+        for sl, hr in sorted(pf_lat_a["best_per_group"].keys()):
+            r = pf_lat_a["best_per_group"][(sl, hr)]
             rows.append([
-                sl, r["tp"], r["ep"], r["dp"], r["edp"],
+                sl, fmt_num(hr, 2), r["tp"], r["ep"], r["dp"], r["edp"],
                 r["batch_size"], r["sp"], r["physical_gpus"],
                 fmt_num(r["prefill_time_ms"]),
             ])
@@ -489,12 +510,12 @@ def generate_markdown_report_zh(results_dir, all_results, all_analyses, meta):
 
     if pf_lat_a.get("sp_impact"):
         lines.append("### 序列并行对预填充的影响\n")
-        headers = ["序列长度", "SP=True(ms)", "SP=False(ms)", "加速比"]
+        headers = ["序列长度", "命中率", "SP=True(ms)", "SP=False(ms)", "加速比"]
         rows = []
-        for sl in sorted(pf_lat_a["sp_impact"].keys()):
-            imp = pf_lat_a["sp_impact"][sl]
+        for sl, hr in sorted(pf_lat_a["sp_impact"].keys()):
+            imp = pf_lat_a["sp_impact"][(sl, hr)]
             rows.append([
-                sl, fmt_num(imp["sp_true_ms"]),
+                sl, fmt_num(hr, 2), fmt_num(imp["sp_true_ms"]),
                 fmt_num(imp["sp_false_ms"]),
                 f"{imp['speedup']:.2f}x",
             ])
@@ -508,27 +529,28 @@ def generate_markdown_report_zh(results_dir, all_results, all_analyses, meta):
 
     if dc_lat:
         lines.append("### 前10最优配置\n")
-        headers = ["排名", "TP", "EP", "DP", "EDP", "BS", "序列长度", "SP", "重叠",
+        headers = ["排名", "TP", "EP", "DP", "EDP", "BS", "序列长度", "命中率", "SP", "重叠",
                     "GPU数", "首步(ms)", "HBM(GB)"]
         rows = []
         for i, r in enumerate(dc_lat[:10]):
             rows.append([
                 i + 1, r["tp"], r["ep"], r["dp"], r["edp"],
-                r["batch_size"], r["seq_len"], r["sp"], r["shared_expert_overlapped"],
+                r["batch_size"], r["seq_len"], fmt_num(hit_rate(r), 2),
+                r["sp"], r["shared_expert_overlapped"],
                 r["physical_gpus"], fmt_num(r["decode_first_step_ms"], 3),
                 fmt_num(r["hbm_total_gb"]),
             ])
         lines.append(md_table(headers, rows))
         lines.append("")
 
-    if dc_lat_a.get("best_per_seq"):
-        lines.append("### 各序列长度最优配置\n")
-        headers = ["序列长度", "TP", "EP", "DP", "EDP", "BS", "SP", "GPU数", "首步(ms)"]
+    if dc_lat_a.get("best_per_group"):
+        lines.append("### 各序列长度 / Prefix Cache 命中率最优配置\n")
+        headers = ["序列长度", "命中率", "TP", "EP", "DP", "EDP", "BS", "SP", "GPU数", "首步(ms)"]
         rows = []
-        for sl in sorted(dc_lat_a["best_per_seq"].keys()):
-            r = dc_lat_a["best_per_seq"][sl]
+        for sl, hr in sorted(dc_lat_a["best_per_group"].keys()):
+            r = dc_lat_a["best_per_group"][(sl, hr)]
             rows.append([
-                sl, r["tp"], r["ep"], r["dp"], r["edp"],
+                sl, fmt_num(hr, 2), r["tp"], r["ep"], r["dp"], r["edp"],
                 r["batch_size"], r["sp"], r["physical_gpus"],
                 fmt_num(r["decode_first_step_ms"], 3),
             ])
@@ -537,12 +559,12 @@ def generate_markdown_report_zh(results_dir, all_results, all_analyses, meta):
 
     if dc_lat_a.get("sp_impact"):
         lines.append("### 序列并行对解码的影响\n")
-        headers = ["序列长度", "SP=True(ms)", "SP=False(ms)", "加速比"]
+        headers = ["序列长度", "命中率", "SP=True(ms)", "SP=False(ms)", "加速比"]
         rows = []
-        for sl in sorted(dc_lat_a["sp_impact"].keys()):
-            imp = dc_lat_a["sp_impact"][sl]
+        for sl, hr in sorted(dc_lat_a["sp_impact"].keys()):
+            imp = dc_lat_a["sp_impact"][(sl, hr)]
             rows.append([
-                sl, fmt_num(imp["sp_true_ms"], 3),
+                sl, fmt_num(hr, 2), fmt_num(imp["sp_true_ms"], 3),
                 fmt_num(imp["sp_false_ms"], 3),
                 f"{imp['speedup']:.2f}x",
             ])
@@ -556,13 +578,13 @@ def generate_markdown_report_zh(results_dir, all_results, all_analyses, meta):
 
     if pf_thr:
         lines.append("### 前10最优配置\n")
-        headers = ["排名", "TP", "EP", "DP", "EDP", "BS", "序列长度",
+        headers = ["排名", "TP", "EP", "DP", "EDP", "BS", "序列长度", "命中率",
                     "GPU数", "TPS/GPU", "HBM(GB)"]
         rows = []
         for i, r in enumerate(pf_thr[:10]):
             rows.append([
                 i + 1, r["tp"], r["ep"], r["dp"], r["edp"],
-                r["batch_size"], r["seq_len"], r["physical_gpus"],
+                r["batch_size"], r["seq_len"], fmt_num(hit_rate(r), 2), r["physical_gpus"],
                 fmt_num(r["prefill_tps_per_gpu"], 2),
                 fmt_num(r["hbm_total_gb"]),
             ])
@@ -571,12 +593,12 @@ def generate_markdown_report_zh(results_dir, all_results, all_analyses, meta):
 
     if pf_thr_a.get("best_per_gpu"):
         lines.append("### 各GPU数量最优配置\n")
-        headers = ["GPU数", "TP", "EP", "DP", "EDP", "BS", "序列长度", "TPS/GPU"]
+        headers = ["GPU数", "命中率", "TP", "EP", "DP", "EDP", "BS", "序列长度", "TPS/GPU"]
         rows = []
-        for gpus in sorted(pf_thr_a["best_per_gpu"].keys()):
-            r = pf_thr_a["best_per_gpu"][gpus]
+        for gpus, hr in sorted(pf_thr_a["best_per_gpu"].keys()):
+            r = pf_thr_a["best_per_gpu"][(gpus, hr)]
             rows.append([
-                gpus, r["tp"], r["ep"], r["dp"], r["edp"],
+                gpus, fmt_num(hr, 2), r["tp"], r["ep"], r["dp"], r["edp"],
                 r["batch_size"], r["seq_len"],
                 fmt_num(r["prefill_tps_per_gpu"], 2),
             ])
@@ -603,7 +625,7 @@ def generate_markdown_report_zh(results_dir, all_results, all_analyses, meta):
 
     if dc_thr:
         lines.append("### 前10最优配置\n")
-        headers = ["排名", "TP", "EP", "DP", "EDP", "BS", "序列长度",
+        headers = ["排名", "TP", "EP", "DP", "EDP", "BS", "序列长度", "命中率",
                     "GPU数", "TPS/GPU", "精确TPS/GPU", "误差%", "HBM(GB)"]
         rows = []
         for i, r in enumerate(dc_thr[:10]):
@@ -611,7 +633,7 @@ def generate_markdown_report_zh(results_dir, all_results, all_analyses, meta):
             err = r.get("approx_error_pct", "")
             rows.append([
                 i + 1, r["tp"], r["ep"], r["dp"], r["edp"],
-                r["batch_size"], r["seq_len"], r["physical_gpus"],
+                r["batch_size"], r["seq_len"], fmt_num(hit_rate(r), 2), r["physical_gpus"],
                 fmt_num(r["decode_tps_per_gpu"], 2) if isinstance(r.get("decode_tps_per_gpu"), (int, float)) else r.get("decode_tps_per_gpu", "-"),
                 fmt_num(r.get("decode_tps_per_gpu"), 2) if r.get("approx_error_pct", "") != "" else "-",
                 fmt_num(err) if err != "" else "-",
@@ -622,12 +644,12 @@ def generate_markdown_report_zh(results_dir, all_results, all_analyses, meta):
 
     if dc_thr_a.get("best_per_gpu"):
         lines.append("### 各GPU数量最优配置\n")
-        headers = ["GPU数", "TP", "EP", "DP", "EDP", "BS", "序列长度", "TPS/GPU"]
+        headers = ["GPU数", "命中率", "TP", "EP", "DP", "EDP", "BS", "序列长度", "TPS/GPU"]
         rows = []
-        for gpus in sorted(dc_thr_a["best_per_gpu"].keys()):
-            r = dc_thr_a["best_per_gpu"][gpus]
+        for gpus, hr in sorted(dc_thr_a["best_per_gpu"].keys()):
+            r = dc_thr_a["best_per_gpu"][(gpus, hr)]
             rows.append([
-                gpus, r["tp"], r["ep"], r["dp"], r["edp"],
+                gpus, fmt_num(hr, 2), r["tp"], r["ep"], r["dp"], r["edp"],
                 r["batch_size"], r["seq_len"],
                 fmt_num(r["decode_tps_per_gpu"], 2),
             ])
@@ -715,30 +737,30 @@ def main():
               f"BS={b['batch_size']} seq={b['seq_len']} SP={b.get('sp', '-')} "
               f"=> {fmt_num(metric_val, 3)} {metric_label} on {b['physical_gpus']} GPUs")
 
-        # Best per seq_len (latency scenarios)
-        if analysis.get("best_per_seq"):
-            print("  Best per sequence length:")
-            for sl in sorted(analysis["best_per_seq"].keys()):
-                r = analysis["best_per_seq"][sl]
+        # Best per seq_len / prefix-cache hit rate (latency scenarios)
+        if analysis.get("best_per_group"):
+            print("  Best per sequence length / prefix-cache hit rate:")
+            for sl, hr in sorted(analysis["best_per_group"].keys()):
+                r = analysis["best_per_group"][(sl, hr)]
                 val = r[metric_key]
-                print(f"    seq={sl:>6d}: TP={r['tp']:>2d} EP={r['ep']:>3d} DP={r['dp']} "
+                print(f"    seq={sl:>7d} hit={hr:.2f}: TP={r['tp']:>2d} EP={r['ep']:>3d} DP={r['dp']} "
                       f"BS={r['batch_size']:>3d} => {fmt_num(val, 3)} {metric_label}")
 
-        # Best per GPU count (throughput scenarios)
+        # Best per GPU count / prefix-cache hit rate (throughput scenarios)
         if analysis.get("best_per_gpu"):
-            print("  Best per GPU count:")
-            for gpus in sorted(analysis["best_per_gpu"].keys()):
-                r = analysis["best_per_gpu"][gpus]
+            print("  Best per GPU count / prefix-cache hit rate:")
+            for gpus, hr in sorted(analysis["best_per_gpu"].keys()):
+                r = analysis["best_per_gpu"][(gpus, hr)]
                 val = r[metric_key]
-                print(f"    {gpus:>2d} GPUs: TP={r['tp']:>2d} EP={r['ep']:>3d} DP={r['dp']} "
+                print(f"    {gpus:>2d} GPUs hit={hr:.2f}: TP={r['tp']:>2d} EP={r['ep']:>3d} DP={r['dp']} "
                       f"BS={r['batch_size']:>3d} seq={r['seq_len']:>5d} => {fmt_num(val, 3)} {metric_label}")
 
         # SP impact
         if analysis.get("sp_impact"):
             print("  SP Impact:")
-            for sl in sorted(analysis["sp_impact"].keys()):
-                imp = analysis["sp_impact"][sl]
-                print(f"    seq={sl:>6d}: SP=True {fmt_num(imp['sp_true_ms'], 3)} vs "
+            for sl, hr in sorted(analysis["sp_impact"].keys()):
+                imp = analysis["sp_impact"][(sl, hr)]
+                print(f"    seq={sl:>7d} hit={hr:.2f}: SP=True {fmt_num(imp['sp_true_ms'], 3)} vs "
                       f"SP=False {fmt_num(imp['sp_false_ms'], 3)} (speedup={imp['speedup']:.2f}x)")
 
         # Verification
