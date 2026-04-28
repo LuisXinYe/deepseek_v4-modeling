@@ -1,0 +1,70 @@
+{
+  "scenarios": [
+    {
+      "scenario_id": "8k_1k",
+      "label": "8K + 1K",
+      "input_len": 8192,
+      "output_len": 1024
+    },
+    {
+      "scenario_id": "32k_1k",
+      "label": "32K + 1K",
+      "input_len": 32768,
+      "output_len": 1024
+    },
+    {
+      "scenario_id": "128k_1k",
+      "label": "128K + 1K",
+      "input_len": 131072,
+      "output_len": 1024
+    },
+    {
+      "scenario_id": "1m_1k",
+      "label": "1M + 1K",
+      "input_len": 1000000,
+      "output_len": 1024
+    }
+  ],
+  "prefix_cache_hit_rates": [
+    0.0,
+    0.9,
+    0.99
+  ],
+  "decode_instance_sizes": [
+    8,
+    16,
+    32,
+    64
+  ],
+  "prefill_card_counts": [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32,
+    64
+  ],
+  "decode_modes": [
+    {
+      "decode_mode": "no_mtp",
+      "label": "No MTP",
+      "mtp": 0
+    },
+    {
+      "decode_mode": "mtp",
+      "label": "MTP=1",
+      "mtp": 1
+    }
+  ],
+  "report_defaults": {
+    "prefix_cache_hit_rate": 0.0,
+    "quant_mode": "w8a8",
+    "kv_cache_quant_mode": "kv8",
+    "mtp_accept_ratio": 0.9,
+    "tpot_target_ms": 50.0,
+    "w8a8_tflops": 752.0,
+    "weight_scale_overhead_bytes": 0.0,
+    "kv_scale_overhead_bytes": 0.0
+  }
+}

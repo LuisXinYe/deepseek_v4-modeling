@@ -1,0 +1,26 @@
+{
+  "generated_at": "2026-04-28T13:11:12.688122+00:00",
+  "git_commit": "7b98e8643f693ee6c3e90dc11b01f1d52180b999",
+  "hardware_config_path": "configs/device_910C.json",
+  "network_config_path": "configs/network_910C.json",
+  "model_config_path": "configs/model_deepseekv4.json",
+  "runtime_config_path": "configs/runtime_deepseekv4.json",
+  "runtime_defaults": {
+    "prefix_cache_hit_rates": [
+      0.0,
+      0.9,
+      0.99
+    ],
+    "quant_mode": "w8a8",
+    "kv_cache_quant_mode": "kv8"
+  },
+  "quantization_defaults": {
+    "quant_mode": "w8a8",
+    "kv_cache_quant_mode": "kv8",
+    "w8a8_tflops": 752.0
+  },
+  "mtp_defaults": {
+    "mtp_accept_ratio": 0.9
+  },
+  "tpot_target_ms": 50.0
+}
