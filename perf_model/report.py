@@ -103,6 +103,8 @@ def print_config_summary(cfg: Config):
     print(f"  BF16 Cube TFLOPS:    {cfg.hw.cube_tflops}")
     print(f"  BF16 Vector TFLOPS:  {cfg.hw.vec_tflops}")
     print(f"  HBM Capacity:        {cfg.hw.hbm_capacity_gb} GB")
+    print(f"  HBM Reserved:        {cfg.hw.hbm_reserved_pct:.1f}%")
+    print(f"  HBM Usable:          {cfg.hw.usable_hbm_capacity_gb:.2f} GB")
     print(f"  HBM Bandwidth:       {cfg.hw.hbm_bandwidth_gbps} GB/s")
     print(f"  FLOPS Utilization:   {cfg.hw.flops_utilization:.0%}")
     print(f"  HBM BW Utilization:  {cfg.hw.hbm_bw_utilization:.0%}")
@@ -266,12 +268,15 @@ def print_memory_report(cfg: Config):
     # Total HBM
     total_hbm = wm["total"] + kv["total_bytes"]
     capacity = cfg.hw.hbm_capacity_gb * 1e9
+    usable_capacity = cfg.hw.usable_hbm_capacity_gb * 1e9
     print(f"  Total HBM Usage:         {fmt_bytes(total_hbm)}")
     print(f"  HBM Capacity:            {fmt_bytes(capacity)}")
-    pct = total_hbm / capacity * 100
-    print(f"  Utilization:             {pct:.1f}%")
-    if total_hbm > capacity:
-        print(f"  WARNING: Exceeds HBM capacity by {fmt_bytes(total_hbm - capacity)}!")
+    print(f"  HBM Reserved:            {cfg.hw.hbm_reserved_pct:.1f}%")
+    print(f"  Usable HBM Capacity:     {fmt_bytes(usable_capacity)}")
+    pct = total_hbm / usable_capacity * 100
+    print(f"  Usable Utilization:      {pct:.1f}%")
+    if total_hbm > usable_capacity:
+        print(f"  WARNING: Exceeds usable HBM capacity by {fmt_bytes(total_hbm - usable_capacity)}!")
     print()
 
 
@@ -379,6 +384,9 @@ def export_memory_csv(filepath: str, cfg: Config):
         writer.writerow(["total", "hbm_usage", f"{total_hbm:.0f}", fmt_bytes(total_hbm)])
         capacity = cfg.hw.hbm_capacity_gb * 1e9
         writer.writerow(["total", "hbm_capacity", f"{capacity:.0f}", fmt_bytes(capacity)])
+        usable_capacity = cfg.hw.usable_hbm_capacity_gb * 1e9
+        writer.writerow(["total", "hbm_reserved_pct", f"{cfg.hw.hbm_reserved_pct:.3f}", f"{cfg.hw.hbm_reserved_pct:.3f}%"])
+        writer.writerow(["total", "usable_hbm_capacity", f"{usable_capacity:.0f}", fmt_bytes(usable_capacity)])
 
 
 def export_summary_csv(filepath: str, metrics: dict):

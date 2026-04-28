@@ -11,9 +11,17 @@ class HardwareConfig:
     cube_tflops: float = 376
     vec_tflops: float = 24
     hbm_capacity_gb: float = 64
+    hbm_reserved_pct: float = 0.0
     hbm_bandwidth_gbps: float = 1800
     flops_utilization: float = 0.5
     hbm_bw_utilization: float = 0.8
+
+    @property
+    def usable_hbm_capacity_gb(self) -> float:
+        """HBM capacity available to model data after reserving runtime headroom."""
+        if self.hbm_reserved_pct < 0 or self.hbm_reserved_pct >= 100:
+            raise ValueError("hbm_reserved_pct must be in [0, 100)")
+        return self.hbm_capacity_gb * (1 - self.hbm_reserved_pct / 100)
 
 
 @dataclass

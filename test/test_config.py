@@ -24,15 +24,24 @@ class TestHardwareConfig(unittest.TestCase):
         self.assertEqual(hw.cube_tflops, 376)
         self.assertEqual(hw.vec_tflops, 24)
         self.assertEqual(hw.hbm_capacity_gb, 64)
+        self.assertEqual(hw.hbm_reserved_pct, 0.0)
+        self.assertEqual(hw.usable_hbm_capacity_gb, 64)
         self.assertEqual(hw.hbm_bandwidth_gbps, 1800)
         self.assertEqual(hw.flops_utilization, 0.5)
         self.assertEqual(hw.hbm_bw_utilization, 0.8)
 
     def test_custom_values(self):
-        hw = HardwareConfig(cube_tflops=500, vec_tflops=32, hbm_capacity_gb=128)
+        hw = HardwareConfig(
+            cube_tflops=500,
+            vec_tflops=32,
+            hbm_capacity_gb=128,
+            hbm_reserved_pct=12.5,
+        )
         self.assertEqual(hw.cube_tflops, 500)
         self.assertEqual(hw.vec_tflops, 32)
         self.assertEqual(hw.hbm_capacity_gb, 128)
+        self.assertEqual(hw.hbm_reserved_pct, 12.5)
+        self.assertEqual(hw.usable_hbm_capacity_gb, 112)
         # unchanged defaults
         self.assertEqual(hw.hbm_bandwidth_gbps, 1800)
 
@@ -200,6 +209,7 @@ class TestConfigFromJson(unittest.TestCase):
             with open(hw_path, "w") as f:
                 json.dump({"cube_tflops": 100, "vec_tflops": 10,
                            "hbm_capacity_gb": 32, "hbm_bandwidth_gbps": 900,
+                           "hbm_reserved_pct": 25,
                            "flops_utilization": 0.6, "hbm_bw_utilization": 0.7}, f)
             with open(net_path, "w") as f:
                 json.dump({"tp_bandwidth_GBps": 200, "ep_bandwidth_GBps": 200,
@@ -228,6 +238,8 @@ class TestConfigFromJson(unittest.TestCase):
             cfg = Config.from_json(hw_path, net_path, model_path, rt_path)
 
             self.assertEqual(cfg.hw.cube_tflops, 100)
+            self.assertEqual(cfg.hw.hbm_reserved_pct, 25)
+            self.assertEqual(cfg.hw.usable_hbm_capacity_gb, 24)
             self.assertEqual(cfg.net.tp_bandwidth_gbps, 200)
             self.assertEqual(cfg.model.hidden_size, 512)
             self.assertFalse(hasattr(cfg.model, "extra_field"))

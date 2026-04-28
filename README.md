@@ -81,8 +81,12 @@ The data flow follows a simple pipeline:
 
 ### Adding new hardware configs
 Create a new `configs/device_xxx.json` with fields matching `HardwareConfig`:
-- `cube_tflops`, `vec_tflops`, `hbm_capacity_gb`, `hbm_bandwidth_gbps`
+- `cube_tflops`, `vec_tflops`, `hbm_capacity_gb`, `hbm_reserved_pct`, `hbm_bandwidth_gbps`
 - `flops_utilization`, `hbm_bw_utilization`
+
+`hbm_reserved_pct` reserves HBM headroom for runtime overhead. OOM checks and
+parameter searches use `hbm_capacity_gb * (1 - hbm_reserved_pct / 100)` as the
+usable memory limit.
 
 ### Adding new model configs
 Create a new `configs/model_xxx.json`. Key field: `compress_ratios` must be a list of length `num_layers` specifying the compression ratio per layer (1 = full attention).
@@ -107,7 +111,7 @@ The search evaluates 4 independent scenarios:
 
 **Search grid:** TP ∈ {1,2,4,8,16,32,64}, EP ∈ {1,2,4,...,256}, DP ∈ {1,2,4,8}, BS ∈ {1,...,512}, seq ∈ {1K,...,32K}
 **GPU formula:** `physical_gpus = TP * DP`, constraint `(TP*DP) % EP == 0`
-**Constraints:** GPU count ∈ [8, 64], HBM ≤ 64 GB
+**Constraints:** GPU count ∈ [8, 64], memory must fit within usable HBM from the hardware config
 
 **Key results (Ascend 910C):**
 

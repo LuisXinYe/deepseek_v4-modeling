@@ -50,12 +50,10 @@ HARDWARE_CONFIGS = {
     "910C": {
         "device": os.path.join(BASE_DIR, "configs", "device_910C.json"),
         "network": os.path.join(BASE_DIR, "configs", "network_910C.json"),
-        "hbm_limit_gb": 64,
     },
     "H20": {
         "device": os.path.join(BASE_DIR, "configs", "device_h20.json"),
         "network": os.path.join(BASE_DIR, "configs", "network_h20.json"),
-        "hbm_limit_gb": 96,
     },
 }
 
@@ -141,12 +139,13 @@ def validate_parallelism(tp, ep, model_cfg):
     return True
 
 
-def check_memory(cfg, hbm_limit_gb):
+def check_memory(cfg, hbm_limit_gb=None):
     wm = weight_memory_per_rank(cfg)
     kv = kv_cache_memory(cfg)
     weight_gb = wm["total"] / 1e9
     kv_gb = kv["total_bytes"] / 1e9
     total_gb = weight_gb + kv_gb
+    hbm_limit_gb = cfg.hw.usable_hbm_capacity_gb if hbm_limit_gb is None else hbm_limit_gb
     return weight_gb, kv_gb, total_gb, total_gb <= hbm_limit_gb
 
 
@@ -678,7 +677,7 @@ KV_SCALING_SEQ_LENS = [
 
 def compute_kv_cache_scaling(base_cfg, hw_name):
     """Sweep seq_len and compute KV cache, decode time, and op breakdown."""
-    hbm_limit = HARDWARE_CONFIGS[hw_name]["hbm_limit_gb"]
+    hbm_limit = base_cfg.hw.usable_hbm_capacity_gb
     results = []
 
     for seq_len in KV_SCALING_SEQ_LENS:
@@ -738,7 +737,7 @@ def compute_kv_cache_scaling(base_cfg, hw_name):
 
 def compute_attention_analysis(base_cfg, hw_name):
     """Per-layer-type KV cache breakdown and attention scaling analysis."""
-    hbm_limit = HARDWARE_CONFIGS[hw_name]["hbm_limit_gb"]
+    hbm_limit = base_cfg.hw.usable_hbm_capacity_gb
 
     # --- Per-layer-type KV cache breakdown ---
     layer_type_kv = {}
@@ -866,7 +865,7 @@ def main():
         print(f"{'='*70}")
 
         base_cfg = load_base_config(hw_name)
-        hbm_limit = HARDWARE_CONFIGS[hw_name]["hbm_limit_gb"]
+        hbm_limit = base_cfg.hw.usable_hbm_capacity_gb
 
         hw_search = {}
         hw_pd = {}

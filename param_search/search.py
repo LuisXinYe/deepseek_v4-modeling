@@ -40,9 +40,6 @@ PREFIX_CACHE_HIT_RATE_VALUES = [0.0, 0.9, 0.99]
 
 MIN_GPUS = 8
 MAX_GPUS = 64
-HBM_LIMIT_GB = 64
-
-
 CSV_COLUMNS = [
     "tp", "ep", "dp", "edp", "batch_size", "seq_len",
     "logical_input_len", "effective_prefill_len", "decode_context_len", "prefix_cache_hit_rate",
@@ -112,7 +109,7 @@ def check_memory(cfg):
     weight_gb = wm["total"] / 1e9
     kv_gb = kv["total_bytes"] / 1e9
     total_gb = weight_gb + kv_gb
-    return weight_gb, kv_gb, total_gb, total_gb <= HBM_LIMIT_GB
+    return weight_gb, kv_gb, total_gb, total_gb <= cfg.hw.usable_hbm_capacity_gb
 
 
 def validate_parallelism(tp, ep, model_cfg):
@@ -471,7 +468,9 @@ def main():
         "constraints": {
             "min_gpus": MIN_GPUS,
             "max_gpus": MAX_GPUS,
-            "hbm_limit_gb": HBM_LIMIT_GB,
+            "hbm_capacity_gb": base_cfg.hw.hbm_capacity_gb,
+            "hbm_reserved_pct": base_cfg.hw.hbm_reserved_pct,
+            "usable_hbm_capacity_gb": base_cfg.hw.usable_hbm_capacity_gb,
             "gpu_formula": "physical_gpus = tp * dp",
             "edp_constraint": "(tp * dp) % ep == 0",
         },

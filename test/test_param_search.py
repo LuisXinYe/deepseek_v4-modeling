@@ -54,6 +54,24 @@ class TestSearchHelpers(unittest.TestCase):
         self.assertEqual(mem_cfg.rt.seq_len, 8192)
         self.assertEqual(eval_cfg.rt.seq_len, 820)
 
+    def test_search_memory_check_uses_hbm_reserved_pct(self):
+        cfg = make_config(hbm_capacity_gb=100, hbm_reserved_pct=10)
+        with patch.object(search, "weight_memory_per_rank", return_value={"total": 85e9}), \
+             patch.object(search, "kv_cache_memory", return_value={"total_bytes": 6e9}):
+            _, _, total_gb, fits = search.check_memory(cfg)
+
+        self.assertEqual(total_gb, 91)
+        self.assertFalse(fits)
+
+    def test_scenario_memory_check_uses_hbm_reserved_pct(self):
+        cfg = make_config(hbm_capacity_gb=100, hbm_reserved_pct=10)
+        with patch.object(analyze_scenarios, "weight_memory_per_rank", return_value={"total": 85e9}), \
+             patch.object(analyze_scenarios, "kv_cache_memory", return_value={"total_bytes": 5e9}):
+            _, _, total_gb, fits = analyze_scenarios.check_memory(cfg)
+
+        self.assertEqual(total_gb, 90)
+        self.assertTrue(fits)
+
 
 class TestSearchMatrix(unittest.TestCase):
     @patch.object(search, "TP_VALUES", [2])

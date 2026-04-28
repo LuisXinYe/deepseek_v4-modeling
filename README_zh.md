@@ -81,8 +81,11 @@ report/                   # 分析报告
 
 ### 添加新硬件配置
 创建新的 `configs/device_xxx.json`，字段对应 `HardwareConfig`：
-- `cube_tflops`、`vec_tflops`、`hbm_capacity_gb`、`hbm_bandwidth_gbps`
+- `cube_tflops`、`vec_tflops`、`hbm_capacity_gb`、`hbm_reserved_pct`、`hbm_bandwidth_gbps`
 - `flops_utilization`、`hbm_bw_utilization`
+
+`hbm_reserved_pct` 用于为运行时开销预留 HBM 余量。OOM 判断和参数搜索会使用
+`hbm_capacity_gb * (1 - hbm_reserved_pct / 100)` 作为可用 HBM 上限。
 
 ### 添加新模型配置
 创建新的 `configs/model_xxx.json`。关键字段：`compress_ratios` 必须是长度为 `num_layers` 的列表，指定每层的压缩比（1 = 全注意力）。
@@ -107,7 +110,7 @@ python param_search/analyze.py    # 分析结果并生成报告
 
 **搜索空间：** TP ∈ {1,2,4,8,16,32,64}，EP ∈ {1,2,4,...,256}，DP ∈ {1,2,4,8}，BS ∈ {1,...,512}，seq ∈ {1K,...,32K}
 **GPU 公式：** `physical_gpus = TP * DP`，约束 `(TP*DP) % EP == 0`
-**约束条件：** GPU 数量 ∈ [8, 64]，HBM ≤ 64 GB
+**约束条件：** GPU 数量 ∈ [8, 64]，显存必须小于等于硬件配置中的可用 HBM
 
 **关键结果（昇腾 910C，8K/4K）：**
 

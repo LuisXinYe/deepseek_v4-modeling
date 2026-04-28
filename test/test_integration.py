@@ -34,7 +34,7 @@ class TestEndToEnd(unittest.TestCase):
         kv = kv_cache_memory(cfg)
         wm = weight_memory_per_rank(cfg)
         total_hbm = kv["total_bytes"] + wm["total"]
-        capacity = cfg.hw.hbm_capacity_gb * 1e9
+        capacity = cfg.hw.usable_hbm_capacity_gb * 1e9
         self.assertLessEqual(total_hbm, capacity)
 
     def test_all_ratio_types_covered(self):
