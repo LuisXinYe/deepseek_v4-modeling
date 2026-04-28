@@ -12,26 +12,66 @@ from .quantization import (
 )
 
 
-def make_prefill_compute_config(cfg: Config) -> Config:
+def _validate_serving_config(cfg: Config) -> None:
     cfg.rt.validate_serving_fields()
+
+    if cfg.rt.seq_len < 0:
+        raise ValueError("seq_len must be >= 0")
+    if cfg.rt.request_input_len < 0:
+        raise ValueError("request_input_len must be >= 0")
+    if cfg.rt.decode_context_len_effective < 0:
+        raise ValueError("decode_context_len_effective must be >= 0")
+    if cfg.rt.output_len < 0:
+        raise ValueError("output_len must be >= 0")
+
+    if cfg.rt.batch_size <= 0:
+        raise ValueError("batch_size must be > 0")
+    if cfg.rt.tp <= 0:
+        raise ValueError("tp must be > 0")
+    if cfg.rt.dp <= 0:
+        raise ValueError("dp must be > 0")
+    if cfg.rt.ep <= 0:
+        raise ValueError("ep must be > 0")
+
+    if cfg.rt.batch_size % cfg.rt.dp != 0:
+        raise ValueError("batch_size must be divisible by dp")
+
+    physical_gpus = cfg.rt.tp * cfg.rt.dp
+    if physical_gpus % cfg.rt.ep != 0:
+        raise ValueError("tp * dp must be divisible by ep")
+
+    if cfg.model.num_attention_heads % cfg.rt.tp != 0:
+        raise ValueError("num_attention_heads must be divisible by tp")
+    if cfg.model.o_groups % cfg.rt.tp != 0:
+        raise ValueError("o_groups must be divisible by tp")
+    if cfg.model.index_n_heads % cfg.rt.tp != 0:
+        raise ValueError("index_n_heads must be divisible by tp")
+    if cfg.model.vocab_size % cfg.rt.tp != 0:
+        raise ValueError("vocab_size must be divisible by tp")
+    if cfg.model.n_routed_experts % cfg.rt.ep != 0:
+        raise ValueError("n_routed_experts must be divisible by ep")
+
+
+def make_prefill_compute_config(cfg: Config) -> Config:
+    _validate_serving_config(cfg)
     seq_len = cfg.rt.effective_prefill_len
     return replace(cfg, rt=replace(cfg.rt, seq_len=seq_len))
 
 
 def make_prefill_memory_config(cfg: Config) -> Config:
-    cfg.rt.validate_serving_fields()
+    _validate_serving_config(cfg)
     input_len = cfg.rt.request_input_len
     return replace(cfg, rt=replace(cfg.rt, seq_len=input_len))
 
 
 def make_decode_compute_config(cfg: Config) -> Config:
-    cfg.rt.validate_serving_fields()
+    _validate_serving_config(cfg)
     input_len = cfg.rt.decode_context_len_effective
     return replace(cfg, rt=replace(cfg.rt, seq_len=input_len))
 
 
 def make_decode_memory_config(cfg: Config) -> Config:
-    cfg.rt.validate_serving_fields()
+    _validate_serving_config(cfg)
     context_len = cfg.rt.decode_context_len_effective + cfg.rt.output_len
     return replace(cfg, rt=replace(cfg.rt, seq_len=context_len))
 

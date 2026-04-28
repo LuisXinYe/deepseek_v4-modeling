@@ -7,6 +7,7 @@ from perf_model.serving import (
     decode_forward_count,
     make_prefill_compute_config,
     make_prefill_memory_config,
+    make_decode_compute_config,
     make_decode_memory_config,
     evaluate_prefill_serving,
     evaluate_decode_serving,
@@ -21,7 +22,13 @@ class TestServingHelpers(unittest.TestCase):
         self.assertEqual(decode_forward_count(output_len=1024, mtp=1, mtp_accept_ratio=0.9), 539)
 
     def test_prefix_cache_compute_and_memory_lengths(self):
-        cfg = make_config(seq_len=8192, input_len=8192, output_len=1024, prefix_cache_hit_rate=0.9)
+        cfg = make_config(
+            seq_len=8192,
+            input_len=8192,
+            output_len=1024,
+            prefix_cache_hit_rate=0.9,
+            ep=2,
+        )
         self.assertEqual(make_prefill_compute_config(cfg).rt.seq_len, 820)
         self.assertEqual(make_prefill_memory_config(cfg).rt.seq_len, 8192)
         self.assertEqual(make_decode_memory_config(cfg).rt.seq_len, 9216)
@@ -48,7 +55,7 @@ class TestServingHelpers(unittest.TestCase):
         self.assertEqual(ratio["decode_instances"], 2)
 
     def test_full_prefix_cache_hit_returns_zero_prefill_time_and_no_throughput(self):
-        cfg = make_config(input_len=1024, prefix_cache_hit_rate=1.0)
+        cfg = make_config(input_len=1024, prefix_cache_hit_rate=1.0, ep=2)
         metrics = evaluate_prefill_serving(cfg)
         self.assertEqual(metrics["effective_prefill_len"], 0)
         self.assertEqual(metrics["prefill_time_ms"], 0.0)
@@ -76,26 +83,57 @@ class TestServingHelpers(unittest.TestCase):
             self.assertIn(key, metrics)
 
     def test_invalid_runtime_fields_raise_through_serving_helpers(self):
-        cfg = make_config(mtp_accept_ratio=1.1)
+        cfg = make_config(mtp_accept_ratio=1.1, ep=2)
         with self.assertRaises(ValueError):
             evaluate_decode_serving(cfg)
 
-        cfg = make_config(kv_cache_quant_mode="bad")
+        cfg = make_config(kv_cache_quant_mode="bad", ep=2)
         with self.assertRaises(ValueError):
             evaluate_prefill_serving(cfg)
 
-        cfg = make_config()
+        cfg = make_config(ep=2)
         cfg = replace(cfg, rt=replace(cfg.rt, mtp=-1))
         with self.assertRaises(ValueError):
             make_prefill_compute_config(cfg)
 
-        cfg = make_config(input_len=100, prefix_cache_hit_rate=-0.1)
+        cfg = make_config(input_len=100, prefix_cache_hit_rate=-0.1, ep=2)
         with self.assertRaises(ValueError):
             make_prefill_compute_config(cfg)
 
-        cfg = make_config(input_len=100, prefix_cache_hit_rate=1.1)
+        cfg = make_config(input_len=100, prefix_cache_hit_rate=1.1, ep=2)
         with self.assertRaises(ValueError):
             evaluate_prefill_serving(cfg)
+
+    def test_invalid_serving_runtime_shapes_raise_through_helpers(self):
+        invalid_cases = [
+            (make_config(seq_len=-1, ep=2), make_prefill_compute_config, "seq_len"),
+            (make_config(input_len=-1, ep=2), make_prefill_compute_config, "request_input_len"),
+            (make_config(decode_context_len=-1, ep=2), make_decode_compute_config, "decode_context_len_effective"),
+            (make_config(output_len=-1, ep=2), make_decode_memory_config, "output_len"),
+            (make_config(batch_size=0, ep=2), make_prefill_compute_config, "batch_size"),
+            (make_config(tp=0, ep=2), evaluate_decode_serving, "tp"),
+            (make_config(dp=0, ep=2), evaluate_prefill_serving, "dp"),
+            (make_config(ep=0), make_prefill_memory_config, "ep"),
+            (make_config(batch_size=3, dp=2, tp=2, ep=4), evaluate_decode_serving, "batch_size.*dp"),
+            (make_config(tp=2, dp=1, ep=4), make_prefill_compute_config, "tp \\* dp.*ep"),
+        ]
+        for cfg, helper, message in invalid_cases:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(ValueError, message):
+                    helper(cfg)
+
+    def test_invalid_serving_model_shapes_raise_through_helpers(self):
+        invalid_cases = [
+            (make_config(num_attention_heads=7, ep=2), "num_attention_heads.*tp"),
+            (make_config(o_groups=3, ep=2), "o_groups.*tp"),
+            (make_config(index_n_heads=7, ep=2), "index_n_heads.*tp"),
+            (make_config(vocab_size=1025, ep=2), "vocab_size.*tp"),
+            (make_config(n_routed_experts=15, ep=2), "n_routed_experts.*ep"),
+        ]
+        for cfg, message in invalid_cases:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(ValueError, message):
+                    evaluate_prefill_serving(cfg)
 
 
 if __name__ == "__main__":
