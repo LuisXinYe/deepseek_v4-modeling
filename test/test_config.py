@@ -107,6 +107,14 @@ class TestHardwareConfigPhaseFields(unittest.TestCase):
         with self.assertRaises(ValueError):
             HardwareConfig(decode_utilization=-0.1)
 
+    def test_negative_vec_static_latency_raises(self):
+        with self.assertRaises(ValueError):
+            HardwareConfig(vec_static_latency_us=-1.0)
+
+    def test_zero_vec_static_latency_is_valid(self):
+        hw = HardwareConfig(vec_static_latency_us=0.0)
+        self.assertEqual(hw.vec_static_latency_us, 0.0)
+
     def test_minimal_json_uses_defaults(self):
         """A hardware JSON without new fields loads and resolves to positive defaults."""
         import tempfile, json, os

@@ -28,6 +28,8 @@ class HardwareConfig:
             raise ValueError(f"prefill_utilization must be positive, got {self.prefill_utilization}")
         if self.decode_utilization <= 0:
             raise ValueError(f"decode_utilization must be positive, got {self.decode_utilization}")
+        if self.vec_static_latency_us < 0:
+            raise ValueError(f"vec_static_latency_us must be non-negative, got {self.vec_static_latency_us}")
 
     @property
     def usable_hbm_capacity_gb(self) -> float:
