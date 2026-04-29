@@ -6,3 +6,4 @@ output/
 report/data/
 .claude/*
 !.claude/commands/
+.humanize*

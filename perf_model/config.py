@@ -179,16 +179,20 @@ class Config:
     rt: RuntimeConfig = field(default_factory=RuntimeConfig)
 
     def for_phase(self, phase: str | None) -> "Config":
-        """Return a copy of this config with utilizations scaled by the phase factor.
+        """Scale compute and memory utilization by the phase-specific calibration factor.
 
-        Applies the hardware's prefill or decode utilization multiplier to cube,
-        vec, and HBM bandwidth utilization. Returns self unchanged when phase is None.
-        Communication costs are not affected.
+        Prefill is compute-bound (long matmuls, high utilization); decode is
+        memory-bound (short matmuls, lower sustained utilization). Comm ops
+        are unaffected because network bandwidth is regime-independent.
         """
         if phase is None:
             return self
-        factor = (self.hw.prefill_utilization if phase == "prefill"
-                  else self.hw.decode_utilization)
+        if phase == "prefill":
+            factor = self.hw.prefill_utilization
+        elif phase == "decode":
+            factor = self.hw.decode_utilization
+        else:
+            raise ValueError(f"Unknown phase: {phase!r}; expected 'prefill' or 'decode'")
         scaled_hw = dataclasses.replace(
             self.hw,
             cube_utilization=self.hw.effective_cube_utilization * factor,

@@ -5,7 +5,7 @@ from dataclasses import replace
 from .config import Config
 from .layers import LayerProfile, PhaseProfile
 from .memory import kv_cache_memory, weight_memory_per_rank
-from .roofline import OpProfile, sum_ops
+from .roofline import OpProfile, roofline_time, sum_ops
 
 
 WEIGHT_BYTE_RATIOS = {"bf16": 1.0, "w8a8": 0.5}
@@ -102,44 +102,9 @@ def _with_roofline_timings(
     mem_bytes: float,
     comm_time_s: float,
 ) -> OpProfile:
-    flops = op.flops
-    vec_ops = op.vec_ops
-    cube_time = flops / (cube_tflops * 1e12 * cfg.hw.effective_cube_utilization) if flops > 0 else 0.0
-    if vec_ops > 0:
-        vec_time = (vec_ops / (cfg.hw.vec_tflops * 1e12 * cfg.hw.effective_vec_utilization)
-                    + cfg.hw.vec_static_latency_us * 1e-6)
-    else:
-        vec_time = 0.0
-    mem_time = mem_bytes / (cfg.hw.hbm_bandwidth_gbps * 1e9 * cfg.hw.hbm_bw_utilization) if mem_bytes > 0 else 0.0
-
-    compute_side = cube_time + vec_time
-    compute_time = max(compute_side, mem_time)
-    total_time = compute_time + comm_time_s
-
-    if total_time == 0.0:
-        bottleneck = ""
-    elif comm_time_s > compute_time:
-        bottleneck = "COMM"
-    elif mem_time > compute_side:
-        bottleneck = "MEM"
-    elif cube_time >= vec_time:
-        bottleneck = "CUBE"
-    else:
-        bottleneck = "VEC"
-
-    return OpProfile(
-        name=op.name,
-        flops=flops,
-        vec_ops=vec_ops,
-        mem_bytes=mem_bytes,
-        comm_bytes=op.comm_bytes,
-        cube_time_s=cube_time,
-        vec_time_s=vec_time,
-        mem_time_s=mem_time,
-        comm_time_s=comm_time_s,
-        time_s=total_time,
-        bottleneck=bottleneck,
-    )
+    hw = replace(cfg.hw, cube_tflops=cube_tflops)
+    return roofline_time(op.name, op.flops, op.vec_ops, mem_bytes, hw,
+                         comm_time_s=comm_time_s, comm_bytes=op.comm_bytes)
 
 
 def quantize_op_profile(op: OpProfile, cfg: Config) -> OpProfile:
