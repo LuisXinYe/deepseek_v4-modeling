@@ -30,7 +30,7 @@ Following TDD philosophy, each criterion includes positive and negative tests fo
 - AC-3: Prefill and decode model functions apply distinct phase utilization multipliers to all non-communication ops (including embedding, final RMSNorm, LM head, and all layer ops). Communication ops remain unaffected by phase scaling. Direct calls to `roofline_time()` without a phase context are unchanged.
   - Positive Tests (expected to PASS):
     - `prefill_model(cfg)` with `prefill_utilization=0.9` produces longer per-op times than the same cfg with `prefill_utilization=1.0`
-    - `decode_step(S, cfg)` with `decode_utilization=0.8` produces longer per-op times than with `decode_utilization=1.0`
+    - `decode_step(S, cfg)` with `decode_utilization=0.6` produces longer per-op times than with `decode_utilization=1.0`
     - A communication op within a prefill layer has the same `time_s` regardless of `prefill_utilization`
     - A direct `roofline_time(...)` call (no phase context) produces times identical to `phase_util=1.0`
   - Negative Tests (expected to FAIL when criterion is violated):
@@ -97,7 +97,7 @@ The implementation adds the three HardwareConfig fields, updates `roofline_time(
 class HardwareConfig:
     # ... existing fields ...
     prefill_utilization: float = 1.0
-    decode_utilization: float = 0.8
+    decode_utilization: float = 0.6
     vec_static_latency_us: float = 10.0
 
     def __post_init__(self):
@@ -300,7 +300,7 @@ Current code does not yet accept these keys, so loading the updated `device_910C
 
 - Add hardware config fields:
   - `prefill_utilization`, default `1.0`
-  - `decode_utilization`, default `0.8`
+  - `decode_utilization`, default `0.6`
   - `vec_static_latency_us`, default `10.0`
 - Interpret prefill/decode utilization as an additional effective utilization multiplier for all non-communication operator compute and HBM components in that phase.
 - Add `vec_static_latency_us` to `vec_time_s` only when `vec_ops > 0`.

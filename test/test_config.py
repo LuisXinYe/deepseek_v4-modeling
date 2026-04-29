@@ -77,7 +77,7 @@ class TestHardwareConfigPhaseFields(unittest.TestCase):
     def test_new_field_defaults(self):
         hw = HardwareConfig()
         self.assertEqual(hw.prefill_utilization, 1.0)
-        self.assertEqual(hw.decode_utilization, 0.8)
+        self.assertEqual(hw.decode_utilization, 0.6)
         self.assertEqual(hw.vec_static_latency_us, 10.0)
 
     def test_custom_phase_fields(self):
