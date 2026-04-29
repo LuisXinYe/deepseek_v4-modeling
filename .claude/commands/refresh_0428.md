@@ -108,6 +108,8 @@ Required report structure:
 
 Writing requirements:
 
+- Write a **standalone, self-contained** technical report. A reader who has never seen a previous version should understand all conclusions from the current data alone.
+- **Do not reference previous runs, previous parameter values, or version comparisons.** No phrases like "compared to 0.8", "this version brings...", "previously X, now Y". All conclusions must be derived solely from the freshly generated data.
 - Use a technical report style: clear claims, data-backed reasoning, and explicit limitations.
 - Preserve all required 0428 scenarios: `8K + 1K`, `32K + 1K`, `128K + 1K`, `1M + 1K`.
 - Preserve all required prefix cache hit rates: `0`, `0.9`, `0.99`.
