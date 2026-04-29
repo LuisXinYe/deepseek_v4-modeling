@@ -96,8 +96,8 @@ def _with_roofline_timings(
 ) -> OpProfile:
     flops = op.flops
     vec_ops = op.vec_ops
-    cube_time = flops / (cube_tflops * 1e12 * cfg.hw.flops_utilization) if flops > 0 else 0.0
-    vec_time = vec_ops / (cfg.hw.vec_tflops * 1e12 * cfg.hw.flops_utilization) if vec_ops > 0 else 0.0
+    cube_time = flops / (cube_tflops * 1e12 * cfg.hw.effective_cube_utilization) if flops > 0 else 0.0
+    vec_time = vec_ops / (cfg.hw.vec_tflops * 1e12 * cfg.hw.effective_vec_utilization) if vec_ops > 0 else 0.0
     mem_time = mem_bytes / (cfg.hw.hbm_bandwidth_gbps * 1e9 * cfg.hw.hbm_bw_utilization) if mem_bytes > 0 else 0.0
 
     compute_time = max(cube_time, vec_time, mem_time)

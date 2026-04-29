@@ -28,6 +28,10 @@ class TestHardwareConfig(unittest.TestCase):
         self.assertEqual(hw.usable_hbm_capacity_gb, 57.6)
         self.assertEqual(hw.hbm_bandwidth_gbps, 1800)
         self.assertEqual(hw.flops_utilization, 0.5)
+        self.assertIsNone(hw.cube_utilization)
+        self.assertIsNone(hw.vec_utilization)
+        self.assertEqual(hw.effective_cube_utilization, 0.5)
+        self.assertEqual(hw.effective_vec_utilization, 0.5)
         self.assertEqual(hw.hbm_bw_utilization, 0.8)
 
     def test_hardware_w8a8_default(self):
@@ -49,6 +53,19 @@ class TestHardwareConfig(unittest.TestCase):
         self.assertEqual(hw.usable_hbm_capacity_gb, 112)
         # unchanged defaults
         self.assertEqual(hw.hbm_bandwidth_gbps, 1800)
+
+    def test_compute_utilization_overrides_fallback(self):
+        hw = HardwareConfig(
+            flops_utilization=0.6,
+            cube_utilization=0.25,
+            vec_utilization=0.1,
+        )
+        self.assertEqual(hw.effective_cube_utilization, 0.25)
+        self.assertEqual(hw.effective_vec_utilization, 0.1)
+
+        hw = HardwareConfig(flops_utilization=0.6)
+        self.assertEqual(hw.effective_cube_utilization, 0.6)
+        self.assertEqual(hw.effective_vec_utilization, 0.6)
 
 
 class TestNetworkConfig(unittest.TestCase):
@@ -261,7 +278,8 @@ class TestConfigFromJson(unittest.TestCase):
                 json.dump({"cube_tflops": 100, "vec_tflops": 10,
                            "hbm_capacity_gb": 32, "hbm_bandwidth_gbps": 900,
                            "hbm_reserved_pct": 25,
-                           "flops_utilization": 0.6, "hbm_bw_utilization": 0.7,
+                           "hbm_bw_utilization": 0.7,
+                           "cube_utilization": 0.3, "vec_utilization": 0.2,
                            "w8a8_tflops": 250}, f)
             with open(net_path, "w") as f:
                 json.dump({"tp_bandwidth_GBps": 200, "ep_bandwidth_GBps": 200,
@@ -297,6 +315,8 @@ class TestConfigFromJson(unittest.TestCase):
             self.assertEqual(cfg.hw.cube_tflops, 100)
             self.assertEqual(cfg.hw.hbm_reserved_pct, 25)
             self.assertEqual(cfg.hw.usable_hbm_capacity_gb, 24)
+            self.assertEqual(cfg.hw.effective_cube_utilization, 0.3)
+            self.assertEqual(cfg.hw.effective_vec_utilization, 0.2)
             self.assertEqual(cfg.hw.w8a8_tflops, 250)
             self.assertEqual(cfg.hw.effective_w8a8_tflops, 250)
             self.assertEqual(cfg.net.tp_bandwidth_gbps, 200)

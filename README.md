@@ -83,6 +83,7 @@ The data flow follows a simple pipeline:
 Create a new `configs/device_xxx.json` with fields matching `HardwareConfig`:
 - `cube_tflops`, `vec_tflops`, `hbm_capacity_gb`, `hbm_reserved_pct`, `hbm_bandwidth_gbps`
 - `flops_utilization`, `hbm_bw_utilization`
+- Optional `cube_utilization` and `vec_utilization`; when omitted, both fall back to `flops_utilization`
 
 `hbm_reserved_pct` reserves HBM headroom for runtime overhead. OOM checks and
 parameter searches use `hbm_capacity_gb * (1 - hbm_reserved_pct / 100)` as the
