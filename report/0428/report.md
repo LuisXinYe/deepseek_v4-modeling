@@ -70,6 +70,8 @@ MTP 建模：`tokens_per_forward = 1 + mtp × mtp_accept_ratio = 1.9`，`decode_
 
 ## 4. 假设
 
+**硬件与量化**
+
 | 项目 | 取值 |
 | --- | --- |
 | 硬件 | Ascend 910C |
@@ -80,7 +82,30 @@ MTP 建模：`tokens_per_forward = 1 + mtp × mtp_accept_ratio = 1.9`，`decode_
 | HBM 容量 | 64 GB |
 | HBM 预留 | 10.0% |
 | HBM 可用 | 57.6 GB |
-| `decode_utilization` | 0.9 |
+
+**算力与带宽利用率**
+
+| 参数 | 取值 | 含义 |
+| --- | --- | --- |
+| `cube_utilization` | 0.3 | Cube（矩阵）单元有效利用率 |
+| `vec_utilization` | 0.1 | Vector 单元有效利用率 |
+| `hbm_bw_utilization` | 0.1 | HBM 带宽有效利用率 |
+| `prefill_utilization` | 1.0 | Prefill 阶段整体利用率系数 |
+| `decode_utilization` | 0.9 | Decode 阶段整体利用率系数 |
+
+**优化特性开关**
+
+| 特性 | 状态 | 说明 |
+| --- | --- | --- |
+| `mhc_kernel_fused` | **开启** | mHC pre/sinkhorn/post 融合为单一 FP32 kernel，大幅降低 HBM 流量 |
+| `shared_expert_overlapped` | **开启** | Shared expert 计算与 MoE dispatch/combine 通信重叠 |
+| `mhc_sp` | **关闭** | mHC Sequence Parallel（跨 TP 并行化），当前不启用 |
+| `mhc_fused_bf16` | **关闭** | fused mHC 使用 BF16 精度，当前不启用 |
+
+**推理配置**
+
+| 项目 | 取值 |
+| --- | --- |
 | `prefix_cache_hit_rate` | 0, 0.9, 0.99 |
 | MTP accept ratio | 0.9 |
 | TPOT 约束 | ≤ 50 ms |
