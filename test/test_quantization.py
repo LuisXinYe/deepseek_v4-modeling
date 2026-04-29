@@ -72,10 +72,16 @@ class TestQuantization(unittest.TestCase):
         self.assertAlmostEqual(kv_q["total_bytes"], kv_base["total_bytes"] * 0.25 + 456)
 
     def test_attention_uses_kv_memory_ratio_without_compute_acceleration(self):
-        cfg = make_config(quant_mode="w8a8", kv_cache_quant_mode="kv4")
+        cfg = make_config(
+            quant_mode="w8a8",
+            kv_cache_quant_mode="kv4",
+            cube_utilization=0.25,
+            vec_utilization=0.1,
+        )
         op = OpProfile(
             name="attention_comp",
             flops=10**12,
+            vec_ops=10**11,
             mem_bytes=10**9,
             comm_time_s=0.02,
             time_s=1.0,
@@ -89,7 +95,11 @@ class TestQuantization(unittest.TestCase):
         self.assertAlmostEqual(q.mem_bytes, op.mem_bytes * 0.25)
         self.assertAlmostEqual(
             q.cube_time_s,
-            op.flops / (cfg.hw.cube_tflops * 1e12 * cfg.hw.flops_utilization),
+            op.flops / (cfg.hw.cube_tflops * 1e12 * cfg.hw.effective_cube_utilization),
+        )
+        self.assertAlmostEqual(
+            q.vec_time_s,
+            op.vec_ops / (cfg.hw.vec_tflops * 1e12 * cfg.hw.effective_vec_utilization),
         )
 
     def test_phase_quantization_copies_and_recomputes_totals(self):

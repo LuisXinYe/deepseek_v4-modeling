@@ -83,6 +83,7 @@ report/                   # 分析报告
 创建新的 `configs/device_xxx.json`，字段对应 `HardwareConfig`：
 - `cube_tflops`、`vec_tflops`、`hbm_capacity_gb`、`hbm_reserved_pct`、`hbm_bandwidth_gbps`
 - `flops_utilization`、`hbm_bw_utilization`
+- 可选 `cube_utilization`、`vec_utilization`；不配置时二者都回退到 `flops_utilization`
 
 `hbm_reserved_pct` 用于为运行时开销预留 HBM 余量。OOM 判断和参数搜索会使用
 `hbm_capacity_gb * (1 - hbm_reserved_pct / 100)` 作为可用 HBM 上限。当前随仓库提供的硬件配置默认预留 10%。

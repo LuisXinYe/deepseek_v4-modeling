@@ -97,6 +97,20 @@ class TestRooflineTime(unittest.TestCase):
         op = roofline_time("exact_vec", flops=0, vec_ops=vec_ops, mem_bytes=0, hw=self.hw)
         self.assertAlmostEqual(op.vec_time_s, expected, places=15)
 
+    def test_separate_cube_and_vec_utilization(self):
+        hw = HardwareConfig(
+            cube_tflops=100,
+            vec_tflops=10,
+            hbm_bandwidth_gbps=1000,
+            flops_utilization=0.5,
+            cube_utilization=0.25,
+            vec_utilization=0.1,
+            hbm_bw_utilization=0.8,
+        )
+        op = roofline_time("split_util", flops=1e12, vec_ops=1e12, mem_bytes=0, hw=hw)
+        self.assertAlmostEqual(op.cube_time_s, 1e12 / (100 * 1e12 * 0.25), places=15)
+        self.assertAlmostEqual(op.vec_time_s, 1e12 / (10 * 1e12 * 0.1), places=15)
+
     def test_exact_mem_time(self):
         """mem_time = mem_bytes / (bw_gbps * 1e9 * bw_util)."""
         mem_bytes = 1e12

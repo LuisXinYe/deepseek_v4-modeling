@@ -14,6 +14,8 @@ class HardwareConfig:
     hbm_reserved_pct: float = 10.0
     hbm_bandwidth_gbps: float = 1800
     flops_utilization: float = 0.5
+    cube_utilization: float | None = None
+    vec_utilization: float | None = None
     hbm_bw_utilization: float = 0.8
     w8a8_tflops: float | None = None
 
@@ -27,6 +29,14 @@ class HardwareConfig:
     @property
     def effective_w8a8_tflops(self) -> float:
         return self.w8a8_tflops if self.w8a8_tflops is not None else self.cube_tflops * 2
+
+    @property
+    def effective_cube_utilization(self) -> float:
+        return self.cube_utilization if self.cube_utilization is not None else self.flops_utilization
+
+    @property
+    def effective_vec_utilization(self) -> float:
+        return self.vec_utilization if self.vec_utilization is not None else self.flops_utilization
 
 
 @dataclass
