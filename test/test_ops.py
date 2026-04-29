@@ -121,9 +121,9 @@ class TestLightningIndex(unittest.TestCase):
         g = ratio                       # 4
         S_comp = S // g                 # 32
         coeff = cfg.model.compress_coeff(ratio)  # 1.0
-        expected_cube = coeff * (8 * B * S * H * d + (8 * g - 2) * B * d * S_comp)
-        expected_vec = coeff * (4 * g + 1) * d * B * S_comp
-        expected_mem = bytes2(int((B * S * H + 4 * H * d + B * S_comp * d)))
+        expected_cube = (8 * B * S * H * d)
+        expected_vec = (14 * g - 1) * d * B * S_comp
+        expected_mem = bytes2(int((B * S * H + 4 * H * d + 2 * g * d + B * S_comp * d)))
         self.assertEqual(op.flops, expected_cube)
         self.assertEqual(op.vec_ops, expected_vec)
         self.assertEqual(op.mem_bytes, expected_mem)
@@ -201,9 +201,9 @@ class TestKVCompression(unittest.TestCase):
         g = ratio                        # 4
         S_comp = S // g                  # 32
         coeff = cfg.model.compress_coeff(ratio)  # 1.0
-        expected_cube = coeff * (8 * B * S * H * c_kv + (8 * g - 2) * B * c_kv * S_comp)
-        expected_vec = coeff * (4 * g + 1) * c_kv * B * S_comp
-        expected_mem = bytes2(int((B * S * H) + coeff * (4 * H * c_kv) + B * S_comp * c_kv))
+        expected_cube = coeff * (8 * B * S * H * c_kv)
+        expected_vec = coeff * (14 * g - 1) * c_kv * B * S_comp
+        expected_mem = bytes2(int((B * S * H) + coeff * (4 * H * c_kv) + coeff * (2 * g * c_kv) + B * S_comp * c_kv))
         self.assertEqual(kv_op.flops, expected_cube)
         self.assertEqual(kv_op.vec_ops, expected_vec)
         self.assertEqual(kv_op.mem_bytes, expected_mem)
@@ -230,7 +230,7 @@ class TestKVCompression(unittest.TestCase):
         B = 2
         aligned = ops.op_kv_compression_decode(B, 128, 4, cfg)
         unaligned = ops.op_kv_compression_decode(B, 129, 4, cfg)
-        self.assertGreater(aligned.flops, unaligned.flops)
+        self.assertEqual(aligned.flops, unaligned.flops)
 
 
 class TestAttentionCompute(unittest.TestCase):
@@ -247,7 +247,7 @@ class TestAttentionCompute(unittest.TestCase):
         W = cfg.model.window_size                  # 16
         flops_qk = B * Nq * S * W * kv_d * 2
         flops_sv = B * Nq * S * W * kv_d * 2
-        self.assertEqual(op.flops, flops_qk + flops_sv)
+        self.assertEqual(op.flops, (flops_qk + flops_sv) * 1.3)
 
     def test_prefill_swa_flash_attn_mem(self):
         """Flash attention memory: Q + full KV read + O write.
@@ -263,7 +263,7 @@ class TestAttentionCompute(unittest.TestCase):
         kv_bytes = bytes2(B * S * kv_d)  # full KV read in prefill
         o_bytes = bytes2(B * Nq * S * Dqc)
         expected_mem = q_bytes + kv_bytes + o_bytes
-        self.assertEqual(op.mem_bytes, expected_mem)
+        self.assertEqual(op.mem_bytes, expected_mem * 2)
 
     def test_prefill_compressed_with_index(self):
         """C4A: use_index=True -> n_attend=topK. Compressed part only (no SWA)."""
@@ -279,7 +279,7 @@ class TestAttentionCompute(unittest.TestCase):
         flops_comp_qk = B * Nq * S * topK * c_kv * 2
         flops_comp_sv = B * Nq * S * topK * c_kv * 2
         expected_flops = flops_comp_qk + flops_comp_sv
-        self.assertEqual(op.flops, expected_flops)
+        self.assertEqual(op.flops, expected_flops * 1.3)
 
     def test_prefill_compressed_without_index(self):
         """C128A: use_index=False -> n_attend=S//ratio. Compressed part only (no SWA)."""
@@ -294,7 +294,7 @@ class TestAttentionCompute(unittest.TestCase):
         flops_comp_qk = B * Nq * S * S_comp * c_kv * 2
         flops_comp_sv = B * Nq * S * S_comp * c_kv * 2
         expected_flops = flops_comp_qk + flops_comp_sv
-        self.assertEqual(op.flops, expected_flops)
+        self.assertEqual(op.flops, expected_flops * 1.3)
 
     def test_decode_swa(self):
         """Decode SWA: S_query=1, attends to min(W, S_total). K=V shared."""
@@ -308,7 +308,7 @@ class TestAttentionCompute(unittest.TestCase):
         W = min(cfg.model.window_size, S_total)
         flops_qk = B * Nq * 1 * W * kv_d * 2
         flops_sv = B * Nq * 1 * W * kv_d * 2
-        self.assertEqual(op.flops, flops_qk + flops_sv)
+        self.assertEqual(op.flops, (flops_qk + flops_sv) * 1.3)
 
     def test_decode_compressed_with_index(self):
         """Decode compressed with index: n_attend=topK. Compressed part only (no SWA)."""
@@ -323,7 +323,7 @@ class TestAttentionCompute(unittest.TestCase):
         flops_comp_qk = B * Nq * 1 * topK * c_kv * 2
         flops_comp_sv = B * Nq * 1 * topK * c_kv * 2
         expected_flops = flops_comp_qk + flops_comp_sv
-        self.assertEqual(op.flops, expected_flops)
+        self.assertEqual(op.flops, expected_flops * 1.3)
 
     def test_decode_compressed_without_index(self):
         """Decode compressed without index: n_attend=S_total//ratio. Compressed part only."""
@@ -338,7 +338,7 @@ class TestAttentionCompute(unittest.TestCase):
         flops_comp_qk = B * Nq * 1 * S_comp * c_kv * 2
         flops_comp_sv = B * Nq * 1 * S_comp * c_kv * 2
         expected_flops = flops_comp_qk + flops_comp_sv
-        self.assertEqual(op.flops, expected_flops)
+        self.assertEqual(op.flops, expected_flops * 1.3)
 
 
 class TestMHCUnfused(unittest.TestCase):
@@ -395,14 +395,16 @@ class TestMHCUnfused(unittest.TestCase):
         assert_op_valid(self, op)
         n = cfg.model.hc_mult
         D = cfg.model.hidden_size
-        expected_cube = 2 * T * n**2 * D + 3 * T * n * D
+        expected_cube = 2 * T * n**2 * D + 2 * T * n * D
         self.assertEqual(op.flops, expected_cube)
 
-    def test_post_zero_vec(self):
+    def test_post_vec_is_nD(self):
         cfg = make_config()
         T = 256
         op = ops.op_mhc_post(T, cfg)
-        self.assertEqual(op.vec_ops, 0)
+        n = cfg.model.hc_mult
+        D = cfg.model.hidden_size
+        self.assertEqual(op.vec_ops, T * n * D)
 
 
 class TestMHCFused(unittest.TestCase):
@@ -454,7 +456,7 @@ class TestMHCFused(unittest.TestCase):
         unfused_post = ops.op_mhc_post(T, cfg)
         fused_post = ops.op_mhc_post_fused(T, cfg)
         assert_op_valid(self, fused_post)
-        self.assertEqual(fused_post.flops, unfused_post.flops)
+        self.assertEqual(fused_post.flops, unfused_post.flops + unfused_post.vec_ops)
 
     def test_post_pre_fused_cube(self):
         """post_pre_fused cube = post cube + pre cube."""
