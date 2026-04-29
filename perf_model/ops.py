@@ -258,7 +258,7 @@ def op_attention_prefill_swa(B: int, S: int, cfg: Config) -> OpProfile:
     o_bytes = bytes2(B * Nq * S * Dqc)
     mem = q_bytes + kv_bytes + o_bytes
 
-    return roofline_time("attention_swa", total_flops, vec_ops, mem, cfg.hw)
+    return roofline_time("attention_swa", total_flops * 1.3, vec_ops, mem * 2, cfg.hw)
 
 
 def op_attention_prefill_compressed(B: int, S: int, ratio: int, cfg: Config,
@@ -283,7 +283,7 @@ def op_attention_prefill_compressed(B: int, S: int, ratio: int, cfg: Config,
     o_bytes = bytes2(B * Nq * S * Dqc)
     mem = q_bytes + comp_kv_read + o_bytes
 
-    return roofline_time("attention_comp", total_flops, vec_ops, mem, cfg.hw)
+    return roofline_time("attention_comp", total_flops * 1.3, vec_ops, mem * 2, cfg.hw)
 
 
 def op_attention_decode_swa(B: int, S_total: int, cfg: Config) -> OpProfile:
@@ -306,7 +306,7 @@ def op_attention_decode_swa(B: int, S_total: int, cfg: Config) -> OpProfile:
     o_bytes = bytes2(B * Nq * 1 * Dqc)
     mem = q_bytes + kv_cache_bytes + o_bytes
 
-    return roofline_time("attention_swa", total_flops, vec_ops, mem, cfg.hw)
+    return roofline_time("attention_swa", total_flops * 1.3, vec_ops, mem * 2, cfg.hw)
 
 
 def op_attention_decode_compressed(B: int, S_total: int, ratio: int, cfg: Config,
@@ -331,7 +331,7 @@ def op_attention_decode_compressed(B: int, S_total: int, ratio: int, cfg: Config
     o_bytes = bytes2(B * Nq * 1 * Dqc)
     mem = q_bytes + comp_kv + o_bytes
 
-    return roofline_time("attention_comp", total_flops, vec_ops, mem, cfg.hw)
+    return roofline_time("attention_comp", total_flops * 1.3, vec_ops, mem * 2, cfg.hw)
 
 
 # --- mHC (manifold Hyper Connection) ---

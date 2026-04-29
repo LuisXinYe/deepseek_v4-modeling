@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-04-28T13:45:50.066569+00:00",
-  "git_commit": "6b837837af4ba90b3673f89f50f41040f34faa47",
+  "generated_at": "2026-04-28T15:40:06.452107+00:00",
+  "git_commit": "819db85441ad0e8082524ea9cc426fc644064b11",
   "hardware_config_path": "configs/device_910C.json",
   "network_config_path": "configs/network_910C.json",
   "model_config_path": "configs/model_deepseekv4.json",

@@ -40,6 +40,8 @@ DECODE_MODES = [
 ]
 
 MAX_BATCH_PER_CARD_CAP = 1_000_000
+MAX_PREFILL_BATCH_UNITS_CAP = 100_000
+MAX_EXHAUSTIVE_PREFILL_UNITS = 4_096
 
 
 def _git_commit() -> str | None:
@@ -94,9 +96,9 @@ def _decorate_common(row: dict[str, Any], scenario: dict[str, Any]) -> dict[str,
 def _prefill_sort_key(row: dict[str, Any]):
     return (
         row["prefill_tps_per_card"] or -1,
-        -(row["prefill_time_ms"] or math.inf),
         row["prefill_qps_instance"] or -1,
         row["hbm_margin_gb"],
+        -(row["prefill_time_ms"] or math.inf),
         -row["tp"],
         -row["ep"],
     )
@@ -108,18 +110,39 @@ def with_prefix_hit(scenario: dict[str, Any], prefix_cache_hit_rate: float) -> d
     return scoped
 
 
-def select_prefill_for_scenario(
+def _evaluate_prefill_row(
     base_cfg,
     scenario: dict[str, Any],
-    prefix_cache_hit_rate: float,
+    *,
+    cards: int,
+    tp: int,
+    ep: int,
+    dp: int,
+    batch_size: int,
 ) -> dict[str, Any]:
-    scenario = with_prefix_hit(scenario, prefix_cache_hit_rate)
+    cfg = _candidate_cfg(
+        base_cfg,
+        scenario,
+        cards=cards,
+        tp=tp,
+        ep=ep,
+        dp=dp,
+        batch_size=batch_size,
+        mtp=0,
+    )
+    metrics = evaluate_prefill_serving(cfg)
+    row = _decorate_common({**metrics, "tp": tp, "ep": ep, "dp": dp, "sp": cfg.rt.sp}, scenario)
+    row["sizing_batch_size"] = 1
+    row["sizing_physical_gpus"] = cards
+    return row
+
+
+def _find_min_prefill_cards_by_bs1_hbm(base_cfg, scenario: dict[str, Any]) -> int | None:
     for cards in PREFILL_CARD_COUNTS:
-        candidates = []
         for tp, ep, dp, _ in iter_parallel_candidates(cards, batch_size=1):
             if not is_parallel_valid(base_cfg, tp=tp, ep=ep, dp=dp, batch_size=1):
                 continue
-            cfg = _candidate_cfg(
+            row = _evaluate_prefill_row(
                 base_cfg,
                 scenario,
                 cards=cards,
@@ -127,14 +150,111 @@ def select_prefill_for_scenario(
                 ep=ep,
                 dp=dp,
                 batch_size=1,
-                mtp=0,
             )
-            metrics = evaluate_prefill_serving(cfg)
-            row = _decorate_common({**metrics, "tp": tp, "ep": ep, "dp": dp, "sp": cfg.rt.sp}, scenario)
             if row["is_feasible"]:
-                candidates.append(row)
-        if candidates:
-            return max(candidates, key=_prefill_sort_key)
+                return cards
+    return None
+
+
+class PrefillEvaluator:
+    def __init__(self, base_cfg, scenario: dict[str, Any], cards: int):
+        self.base_cfg = base_cfg
+        self.scenario = scenario
+        self.cards = cards
+        self.cache: dict[tuple[int, int, int, int], dict[str, Any]] = {}
+
+    def evaluate(self, tp: int, ep: int, dp: int, batch_size: int) -> dict[str, Any]:
+        key = (tp, ep, dp, batch_size)
+        if key not in self.cache:
+            self.cache[key] = _evaluate_prefill_row(
+                self.base_cfg,
+                self.scenario,
+                cards=self.cards,
+                tp=tp,
+                ep=ep,
+                dp=dp,
+                batch_size=batch_size,
+            )
+        return self.cache[key]
+
+
+def _find_max_prefill_batch_units(evaluator: PrefillEvaluator, tp: int, ep: int, dp: int) -> int:
+    first = evaluator.evaluate(tp, ep, dp, dp)
+    if not _fits_hbm(first):
+        return 0
+
+    low = 1
+    high = 2
+    while high <= MAX_PREFILL_BATCH_UNITS_CAP and _fits_hbm(evaluator.evaluate(tp, ep, dp, high * dp)):
+        low = high
+        high *= 2
+
+    if high > MAX_PREFILL_BATCH_UNITS_CAP:
+        high = MAX_PREFILL_BATCH_UNITS_CAP + 1
+
+    while low + 1 < high:
+        mid = (low + high) // 2
+        if _fits_hbm(evaluator.evaluate(tp, ep, dp, mid * dp)):
+            low = mid
+        else:
+            high = mid
+    return low
+
+
+def _prefill_batch_unit_candidates(max_units: int) -> list[int]:
+    if max_units <= MAX_EXHAUSTIVE_PREFILL_UNITS:
+        return list(range(1, max_units + 1))
+
+    candidates = {1, max_units}
+    power = 1
+    while power < max_units:
+        candidates.add(power)
+        power *= 2
+    for i in range(1, 33):
+        candidates.add(max(1, round(max_units * i / 32)))
+    for unit in range(max(1, max_units - 128), max_units + 1):
+        candidates.add(unit)
+    return sorted(candidates)
+
+
+def select_prefill_perf_for_cards(base_cfg, scenario: dict[str, Any], cards: int) -> dict[str, Any] | None:
+    evaluator = PrefillEvaluator(base_cfg, scenario, cards)
+    best = None
+
+    for tp, ep, dp, _ in iter_parallel_candidates(cards):
+        min_batch_size = dp
+        if not is_parallel_valid(base_cfg, tp=tp, ep=ep, dp=dp, batch_size=min_batch_size):
+            continue
+
+        max_units = _find_max_prefill_batch_units(evaluator, tp, ep, dp)
+        if max_units == 0:
+            continue
+
+        for units in _prefill_batch_unit_candidates(max_units):
+            batch_size = units * dp
+            row = evaluator.evaluate(tp, ep, dp, batch_size)
+            if not row["is_feasible"]:
+                continue
+            row["max_batch_size_hbm"] = max_units * dp
+            row["max_batch_per_card_hbm"] = row["max_batch_size_hbm"] / cards
+            if best is None or _prefill_sort_key(row) > _prefill_sort_key(best):
+                best = row
+
+    return best
+
+
+def select_prefill_for_scenario(
+    base_cfg,
+    scenario: dict[str, Any],
+    prefix_cache_hit_rate: float,
+) -> dict[str, Any]:
+    scenario = with_prefix_hit(scenario, prefix_cache_hit_rate)
+    sizing_cards = _find_min_prefill_cards_by_bs1_hbm(base_cfg, scenario)
+    if sizing_cards is not None:
+        row = select_prefill_perf_for_cards(base_cfg, scenario, sizing_cards)
+        if row is not None:
+            row["sizing_physical_gpus"] = sizing_cards
+            return row
 
     return infeasible_row(
         scenario["scenario_id"],
@@ -762,7 +882,7 @@ def render_report(
         "",
         "## Prefill 分析",
         "",
-        "Prefill 按 `batch_size=1` 搜索模型权重加完整输入 KV cache 可以放入 HBM 的最小实例卡数。",
+        "Prefill 先按 `batch_size=1` 搜索模型权重加完整输入 KV cache 可以放入 HBM 的最小实例卡数；随后在该卡数内搜索 TPS/card 最大的 `{TP, EP, DP, batch_size}` 性能配置。",
         "",
         "![Prefill HBM](figure/prefill_hbm.svg)",
         "",

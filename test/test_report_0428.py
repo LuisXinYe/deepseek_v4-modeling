@@ -42,6 +42,40 @@ class TestReport0428(unittest.TestCase):
             self.assertTrue(candidates)
             self.assertTrue(all(tp * dp == cards for tp, _, dp, _ in candidates))
 
+    def test_prefill_perf_search_is_not_limited_to_sizing_batch(self):
+        common = load_module("report_0428_common_prefill", COMMON_PATH)
+        generator = load_module("report_0428_generator_prefill", GENERATOR_PATH)
+        cfg = common.load_910c_config()
+
+        row = generator.select_prefill_for_scenario(cfg, common.SCENARIOS[0], 0.0)
+
+        self.assertGreater(row["batch_size"], 1)
+        self.assertGreater(row["prefill_tps_per_card"], 0)
+
+    def test_prefill_sort_key_prioritizes_tps_per_card(self):
+        generator = load_module("report_0428_generator_prefill_sort", GENERATOR_PATH)
+        lower_qps_higher_tps = {
+            "prefill_tps_per_card": 200,
+            "prefill_qps_instance": 1,
+            "hbm_margin_gb": 0,
+            "prefill_time_ms": 10,
+            "tp": 1,
+            "ep": 1,
+        }
+        higher_qps_lower_tps = {
+            "prefill_tps_per_card": 100,
+            "prefill_qps_instance": 10,
+            "hbm_margin_gb": 100,
+            "prefill_time_ms": 1,
+            "tp": 1,
+            "ep": 1,
+        }
+
+        self.assertGreater(
+            generator._prefill_sort_key(lower_qps_higher_tps),
+            generator._prefill_sort_key(higher_qps_lower_tps),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

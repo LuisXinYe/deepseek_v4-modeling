@@ -7,61 +7,61 @@
 <line x1="90" y1="374.0" x2="880" y2="374.0" stroke="#e5e7eb"/>
 <text x="80.0" y="378.0" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">0.0</text>
 <line x1="90" y1="311.2" x2="880" y2="311.2" stroke="#e5e7eb"/>
-<text x="80.0" y="315.2" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">8.2</text>
+<text x="80.0" y="315.2" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">11.5</text>
 <line x1="90" y1="248.4" x2="880" y2="248.4" stroke="#e5e7eb"/>
-<text x="80.0" y="252.4" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">16.3</text>
+<text x="80.0" y="252.4" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">23.0</text>
 <line x1="90" y1="185.6" x2="880" y2="185.6" stroke="#e5e7eb"/>
-<text x="80.0" y="189.6" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">24.5</text>
+<text x="80.0" y="189.6" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">34.5</text>
 <line x1="90" y1="122.8" x2="880" y2="122.8" stroke="#e5e7eb"/>
-<text x="80.0" y="126.8" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">32.6</text>
+<text x="80.0" y="126.8" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">46.1</text>
 <line x1="90" y1="60.0" x2="880" y2="60.0" stroke="#e5e7eb"/>
-<text x="80.0" y="64.0" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">40.8</text>
-<rect x="104.5" y="86.9" width="36.9" height="287.1" fill="#2563eb"/>
-<text x="122.9" y="78.9" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">37.3 GB</text>
+<text x="80.0" y="64.0" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">57.6</text>
+<rect x="104.5" y="60.0" width="36.9" height="314.0" fill="#2563eb"/>
+<text x="122.9" y="52.0" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">57.6 GB</text>
 <text x="122.9" y="396.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">8K</text>
 <text x="122.9" y="410.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">h=0</text>
-<rect x="170.3" y="86.9" width="36.9" height="287.1" fill="#2563eb"/>
-<text x="188.7" y="78.9" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">37.3 GB</text>
+<rect x="170.3" y="60.0" width="36.9" height="314.0" fill="#2563eb"/>
+<text x="188.7" y="52.0" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">57.6 GB</text>
 <text x="188.7" y="396.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">8K</text>
 <text x="188.7" y="410.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.9</text>
-<rect x="236.1" y="86.9" width="36.9" height="287.1" fill="#2563eb"/>
-<text x="254.6" y="78.9" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">37.3 GB</text>
+<rect x="236.1" y="60.0" width="36.9" height="314.0" fill="#2563eb"/>
+<text x="254.6" y="52.0" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">57.6 GB</text>
 <text x="254.6" y="396.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">8K</text>
 <text x="254.6" y="410.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.99</text>
-<rect x="302.0" y="86.3" width="36.9" height="287.7" fill="#2563eb"/>
-<text x="320.4" y="78.3" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">37.4 GB</text>
+<rect x="302.0" y="60.2" width="36.9" height="313.8" fill="#2563eb"/>
+<text x="320.4" y="52.2" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">57.6 GB</text>
 <text x="320.4" y="396.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">32K</text>
 <text x="320.4" y="410.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">h=0</text>
-<rect x="367.8" y="86.3" width="36.9" height="287.7" fill="#2563eb"/>
-<text x="386.2" y="78.3" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">37.4 GB</text>
+<rect x="367.8" y="60.2" width="36.9" height="313.8" fill="#2563eb"/>
+<text x="386.2" y="52.2" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">57.6 GB</text>
 <text x="386.2" y="396.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">32K</text>
 <text x="386.2" y="410.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.9</text>
-<rect x="433.6" y="86.3" width="36.9" height="287.7" fill="#2563eb"/>
-<text x="452.1" y="78.3" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">37.4 GB</text>
+<rect x="433.6" y="60.2" width="36.9" height="313.8" fill="#2563eb"/>
+<text x="452.1" y="52.2" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">57.6 GB</text>
 <text x="452.1" y="396.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">32K</text>
 <text x="452.1" y="410.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.99</text>
-<rect x="499.5" y="83.0" width="36.9" height="291.0" fill="#2563eb"/>
-<text x="517.9" y="75.0" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">37.8 GB</text>
+<rect x="499.5" y="60.5" width="36.9" height="313.5" fill="#2563eb"/>
+<text x="517.9" y="52.5" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">57.5 GB</text>
 <text x="517.9" y="396.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">128K</text>
 <text x="517.9" y="410.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">h=0</text>
-<rect x="565.3" y="83.0" width="36.9" height="291.0" fill="#2563eb"/>
-<text x="583.7" y="75.0" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">37.8 GB</text>
+<rect x="565.3" y="60.5" width="36.9" height="313.5" fill="#2563eb"/>
+<text x="583.7" y="52.5" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">57.5 GB</text>
 <text x="583.7" y="396.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">128K</text>
 <text x="583.7" y="410.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.9</text>
-<rect x="631.1" y="83.0" width="36.9" height="291.0" fill="#2563eb"/>
-<text x="649.6" y="75.0" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">37.8 GB</text>
+<rect x="631.1" y="60.5" width="36.9" height="313.5" fill="#2563eb"/>
+<text x="649.6" y="52.5" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">57.5 GB</text>
 <text x="649.6" y="396.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">128K</text>
 <text x="649.6" y="410.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.99</text>
-<rect x="697.0" y="60.0" width="36.9" height="314.0" fill="#2563eb"/>
-<text x="715.4" y="52.0" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">40.8 GB</text>
+<rect x="697.0" y="64.6" width="36.9" height="309.4" fill="#2563eb"/>
+<text x="715.4" y="56.6" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">56.7 GB</text>
 <text x="715.4" y="396.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">1M</text>
 <text x="715.4" y="410.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">h=0</text>
-<rect x="762.8" y="60.0" width="36.9" height="314.0" fill="#2563eb"/>
-<text x="781.2" y="52.0" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">40.8 GB</text>
+<rect x="762.8" y="64.6" width="36.9" height="309.4" fill="#2563eb"/>
+<text x="781.2" y="56.6" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">56.7 GB</text>
 <text x="781.2" y="396.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">1M</text>
 <text x="781.2" y="410.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.9</text>
-<rect x="828.6" y="60.0" width="36.9" height="314.0" fill="#2563eb"/>
-<text x="847.1" y="52.0" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">40.8 GB</text>
+<rect x="828.6" y="64.6" width="36.9" height="309.4" fill="#2563eb"/>
+<text x="847.1" y="56.6" font-size="11" font-weight="400" text-anchor="middle" fill="#1f2937">56.7 GB</text>
 <text x="847.1" y="396.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">1M</text>
 <text x="847.1" y="410.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.99</text>
 </svg>
