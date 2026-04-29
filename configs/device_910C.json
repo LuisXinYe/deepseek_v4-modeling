@@ -8,6 +8,6 @@
     "hbm_bw_utilization": 0.1,
     "vec_utilization": 0.1,
     "prefill_utilization": 1,
-    "decode_utilization": 0.8,
+    "decode_utilization": 0.6,
     "vec_static_latency_us": 10
 }

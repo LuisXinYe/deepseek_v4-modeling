@@ -20,7 +20,7 @@ class HardwareConfig:
     hbm_bw_utilization: float = 0.8
     w8a8_tflops: float | None = None
     prefill_utilization: float = 1.0
-    decode_utilization: float = 0.8
+    decode_utilization: float = 0.6
     vec_static_latency_us: float = 10.0
 
     def __post_init__(self):
