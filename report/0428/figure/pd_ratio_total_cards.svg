@@ -6,159 +6,87 @@
 <line x1="90" y1="408.0" x2="1540" y2="408.0" stroke="#e5e7eb"/>
 <text x="80.0" y="412.0" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">0</text>
 <line x1="90" y1="338.8" x2="1540" y2="338.8" stroke="#e5e7eb"/>
-<text x="80.0" y="342.8" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">8,749</text>
+<text x="80.0" y="342.8" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">352</text>
 <line x1="90" y1="269.6" x2="1540" y2="269.6" stroke="#e5e7eb"/>
-<text x="80.0" y="273.6" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">17,498</text>
+<text x="80.0" y="273.6" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">704</text>
 <line x1="90" y1="200.4" x2="1540" y2="200.4" stroke="#e5e7eb"/>
-<text x="80.0" y="204.4" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">26,246</text>
+<text x="80.0" y="204.4" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">1,056</text>
 <line x1="90" y1="131.2" x2="1540" y2="131.2" stroke="#e5e7eb"/>
-<text x="80.0" y="135.2" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">34,995</text>
+<text x="80.0" y="135.2" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">1,408</text>
 <line x1="90" y1="62.0" x2="1540" y2="62.0" stroke="#e5e7eb"/>
-<text x="80.0" y="66.0" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">43,744</text>
-<rect x="103.3" y="404.3" width="33.8" height="3.2" fill="#2563eb"/>
-<rect x="103.3" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="120.2" y="396.3" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">472</text>
-<text x="120.2" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">8K + 1K</text>
-<text x="120.2" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0</text>
-<text x="120.2" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">No MTP</text>
-<rect x="163.7" y="401.2" width="33.8" height="6.3" fill="#2563eb"/>
-<rect x="163.7" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="180.6" y="393.2" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">864</text>
-<text x="180.6" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">8K + 1K</text>
-<text x="180.6" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0</text>
-<text x="180.6" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
-<rect x="224.1" y="407.2" width="33.8" height="0.3" fill="#2563eb"/>
-<rect x="224.1" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="241.0" y="399.2" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">104</text>
-<text x="241.0" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">8K + 1K</text>
-<text x="241.0" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.9</text>
-<text x="241.0" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">No MTP</text>
-<rect x="284.5" y="406.9" width="33.8" height="0.6" fill="#2563eb"/>
-<rect x="284.5" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="301.5" y="398.9" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">144</text>
-<text x="301.5" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">8K + 1K</text>
-<text x="301.5" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.9</text>
-<text x="301.5" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
-<rect x="345.0" y="406.9" width="33.8" height="0.1" fill="#2563eb"/>
-<rect x="345.0" y="407.0" width="33.8" height="1.0" fill="#dc2626"/>
-<text x="361.9" y="398.9" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">136</text>
-<text x="361.9" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">8K + 1K</text>
-<text x="361.9" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.99</text>
-<text x="361.9" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">No MTP</text>
-<rect x="405.4" y="407.4" width="33.8" height="0.1" fill="#2563eb"/>
-<rect x="405.4" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="422.3" y="399.4" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">72</text>
-<text x="422.3" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">8K + 1K</text>
-<text x="422.3" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.99</text>
-<text x="422.3" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
-<rect x="465.8" y="396.0" width="33.8" height="11.5" fill="#2563eb"/>
-<rect x="465.8" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="482.7" y="388.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">1,520</text>
-<text x="482.7" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">32K + 1K</text>
-<text x="482.7" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0</text>
-<text x="482.7" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">No MTP</text>
-<rect x="526.2" y="385.7" width="33.8" height="21.8" fill="#2563eb"/>
-<rect x="526.2" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="543.1" y="377.7" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">2,824</text>
-<text x="543.1" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">32K + 1K</text>
-<text x="543.1" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0</text>
-<text x="543.1" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
-<rect x="586.6" y="406.5" width="33.8" height="1.0" fill="#2563eb"/>
-<rect x="586.6" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="603.5" y="398.5" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">192</text>
-<text x="603.5" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">32K + 1K</text>
-<text x="603.5" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.9</text>
-<text x="603.5" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">No MTP</text>
-<rect x="647.0" y="405.7" width="33.8" height="1.8" fill="#2563eb"/>
-<rect x="647.0" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="664.0" y="397.7" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">296</text>
-<text x="664.0" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">32K + 1K</text>
-<text x="664.0" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.9</text>
-<text x="664.0" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
-<rect x="707.5" y="406.8" width="33.8" height="0.2" fill="#2563eb"/>
-<rect x="707.5" y="407.0" width="33.8" height="1.0" fill="#dc2626"/>
-<text x="724.4" y="398.8" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">152</text>
-<text x="724.4" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">32K + 1K</text>
-<text x="724.4" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.99</text>
-<text x="724.4" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">No MTP</text>
-<rect x="767.9" y="407.3" width="33.8" height="0.2" fill="#2563eb"/>
-<rect x="767.9" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="784.8" y="399.3" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">88</text>
-<text x="784.8" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">32K + 1K</text>
-<text x="784.8" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.99</text>
-<text x="784.8" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
-<rect x="828.3" y="373.5" width="33.8" height="34.0" fill="#2563eb"/>
-<rect x="828.3" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="845.2" y="365.5" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">4,360</text>
-<text x="845.2" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">128K + 1K</text>
-<text x="845.2" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0</text>
-<text x="845.2" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">No MTP</text>
-<rect x="888.7" y="343.0" width="33.8" height="64.5" fill="#2563eb"/>
-<rect x="888.7" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="905.6" y="335.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">8,216</text>
-<text x="905.6" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">128K + 1K</text>
-<text x="905.6" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0</text>
-<text x="905.6" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
-<rect x="949.1" y="405.6" width="33.8" height="1.9" fill="#2563eb"/>
-<rect x="949.1" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="966.0" y="397.6" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">304</text>
-<text x="966.0" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">128K + 1K</text>
-<text x="966.0" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.9</text>
-<text x="966.0" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">No MTP</text>
-<rect x="1009.5" y="403.9" width="33.8" height="3.6" fill="#2563eb"/>
-<rect x="1009.5" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="1026.5" y="395.9" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">520</text>
-<text x="1026.5" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">128K + 1K</text>
-<text x="1026.5" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.9</text>
-<text x="1026.5" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
-<rect x="1070.0" y="407.3" width="33.8" height="0.2" fill="#2563eb"/>
-<rect x="1070.0" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="1086.9" y="399.3" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">88</text>
-<text x="1086.9" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">128K + 1K</text>
-<text x="1086.9" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.99</text>
-<text x="1086.9" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">No MTP</text>
-<rect x="1130.4" y="407.1" width="33.8" height="0.4" fill="#2563eb"/>
-<rect x="1130.4" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="1147.3" y="399.1" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">112</text>
-<text x="1147.3" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">128K + 1K</text>
-<text x="1147.3" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.99</text>
-<text x="1147.3" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
-<rect x="1190.8" y="225.6" width="33.8" height="181.9" fill="#2563eb"/>
-<rect x="1190.8" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="1207.7" y="217.6" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">23,056</text>
-<text x="1207.7" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">1M + 1K</text>
-<text x="1207.7" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0</text>
-<text x="1207.7" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">No MTP</text>
-<rect x="1251.2" y="62.0" width="33.8" height="345.5" fill="#2563eb"/>
-<rect x="1251.2" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="1268.1" y="54.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">43,744</text>
-<text x="1268.1" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">1M + 1K</text>
-<text x="1268.1" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0</text>
-<text x="1268.1" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
-<rect x="1311.6" y="403.7" width="33.8" height="3.8" fill="#2563eb"/>
-<rect x="1311.6" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="1328.5" y="395.7" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">544</text>
-<text x="1328.5" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">1M + 1K</text>
-<text x="1328.5" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.9</text>
-<text x="1328.5" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">No MTP</text>
-<rect x="1372.0" y="400.3" width="33.8" height="7.2" fill="#2563eb"/>
-<rect x="1372.0" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="1389.0" y="392.3" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">968</text>
-<text x="1389.0" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">1M + 1K</text>
-<text x="1389.0" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.9</text>
-<text x="1389.0" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
-<rect x="1432.5" y="407.2" width="33.8" height="0.3" fill="#2563eb"/>
-<rect x="1432.5" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="1449.4" y="399.2" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">96</text>
-<text x="1449.4" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">1M + 1K</text>
-<text x="1449.4" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.99</text>
-<text x="1449.4" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">No MTP</text>
-<rect x="1492.9" y="407.1" width="33.8" height="0.4" fill="#2563eb"/>
-<rect x="1492.9" y="407.5" width="33.8" height="0.5" fill="#dc2626"/>
-<text x="1509.8" y="399.1" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">120</text>
-<text x="1509.8" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">1M + 1K</text>
-<text x="1509.8" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.99</text>
-<text x="1509.8" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
+<text x="80.0" y="66.0" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">1,760</text>
+<rect x="116.6" y="371.8" width="67.7" height="23.6" fill="#2563eb"/>
+<rect x="116.6" y="395.4" width="67.7" height="12.6" fill="#dc2626"/>
+<text x="150.4" y="363.8" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">184</text>
+<text x="150.4" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">8K + 1K</text>
+<text x="150.4" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0</text>
+<text x="150.4" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
+<rect x="237.4" y="378.1" width="67.7" height="4.7" fill="#2563eb"/>
+<rect x="237.4" y="382.8" width="67.7" height="25.2" fill="#dc2626"/>
+<text x="271.2" y="370.1" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">152</text>
+<text x="271.2" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">8K + 1K</text>
+<text x="271.2" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.9</text>
+<text x="271.2" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
+<rect x="358.2" y="330.9" width="67.7" height="1.6" fill="#2563eb"/>
+<rect x="358.2" y="332.5" width="67.7" height="75.5" fill="#dc2626"/>
+<text x="392.1" y="322.9" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">392</text>
+<text x="392.1" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">8K + 1K</text>
+<text x="392.1" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.99</text>
+<text x="392.1" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
+<rect x="479.1" y="332.5" width="67.7" height="62.9" fill="#2563eb"/>
+<rect x="479.1" y="395.4" width="67.7" height="12.6" fill="#dc2626"/>
+<text x="512.9" y="324.5" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">384</text>
+<text x="512.9" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">32K + 1K</text>
+<text x="512.9" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0</text>
+<text x="512.9" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
+<rect x="599.9" y="389.1" width="67.7" height="6.3" fill="#2563eb"/>
+<rect x="599.9" y="395.4" width="67.7" height="12.6" fill="#dc2626"/>
+<text x="633.7" y="381.1" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">96</text>
+<text x="633.7" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">32K + 1K</text>
+<text x="633.7" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.9</text>
+<text x="633.7" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
+<rect x="720.7" y="341.9" width="67.7" height="3.1" fill="#2563eb"/>
+<rect x="720.7" y="345.1" width="67.7" height="62.9" fill="#dc2626"/>
+<text x="754.6" y="333.9" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">336</text>
+<text x="754.6" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">32K + 1K</text>
+<text x="754.6" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.99</text>
+<text x="754.6" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
+<rect x="841.6" y="271.2" width="67.7" height="124.2" fill="#2563eb"/>
+<rect x="841.6" y="395.4" width="67.7" height="12.6" fill="#dc2626"/>
+<text x="875.4" y="263.2" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">696</text>
+<text x="875.4" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">128K + 1K</text>
+<text x="875.4" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0</text>
+<text x="875.4" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
+<rect x="962.4" y="386.0" width="67.7" height="9.4" fill="#2563eb"/>
+<rect x="962.4" y="395.4" width="67.7" height="12.6" fill="#dc2626"/>
+<text x="996.2" y="378.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">112</text>
+<text x="996.2" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">128K + 1K</text>
+<text x="996.2" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.9</text>
+<text x="996.2" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
+<rect x="1083.2" y="367.1" width="67.7" height="3.1" fill="#2563eb"/>
+<rect x="1083.2" y="370.3" width="67.7" height="37.7" fill="#dc2626"/>
+<text x="1117.1" y="359.1" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">208</text>
+<text x="1117.1" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">128K + 1K</text>
+<text x="1117.1" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.99</text>
+<text x="1117.1" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
+<rect x="1204.1" y="62.0" width="67.7" height="333.4" fill="#2563eb"/>
+<rect x="1204.1" y="395.4" width="67.7" height="12.6" fill="#dc2626"/>
+<text x="1237.9" y="54.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">1,760</text>
+<text x="1237.9" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">1M + 1K</text>
+<text x="1237.9" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0</text>
+<text x="1237.9" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
+<rect x="1324.9" y="386.0" width="67.7" height="9.4" fill="#2563eb"/>
+<rect x="1324.9" y="395.4" width="67.7" height="12.6" fill="#dc2626"/>
+<text x="1358.8" y="378.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">112</text>
+<text x="1358.8" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">1M + 1K</text>
+<text x="1358.8" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.9</text>
+<text x="1358.8" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
+<rect x="1445.8" y="381.3" width="67.7" height="1.6" fill="#2563eb"/>
+<rect x="1445.8" y="382.8" width="67.7" height="25.2" fill="#dc2626"/>
+<text x="1479.6" y="373.3" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">136</text>
+<text x="1479.6" y="430.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">1M + 1K</text>
+<text x="1479.6" y="446.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">h=0.99</text>
+<text x="1479.6" y="462.0" font-size="9" font-weight="400" text-anchor="middle" fill="#1f2937">MTP=1</text>
 <rect x="1430" y="70" width="14" height="14" fill="#2563eb"/>
 <text x="1450.0" y="82.0" font-size="12" font-weight="400" text-anchor="start" fill="#1f2937">Prefill cards</text>
 <rect x="1430" y="96" width="14" height="14" fill="#dc2626"/>

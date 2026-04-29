@@ -8,39 +8,26 @@
 <line x1="90" y1="456.0" x2="830" y2="456.0" stroke="#e5e7eb"/>
 <text x="80.0" y="460.0" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">0.0</text>
 <line x1="90" y1="381.6" x2="830" y2="381.6" stroke="#e5e7eb"/>
-<text x="80.0" y="385.6" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">4,002.6</text>
+<text x="80.0" y="385.6" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">180.5</text>
 <line x1="90" y1="307.2" x2="830" y2="307.2" stroke="#e5e7eb"/>
-<text x="80.0" y="311.2" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">8,005.2</text>
+<text x="80.0" y="311.2" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">360.9</text>
 <line x1="90" y1="232.8" x2="830" y2="232.8" stroke="#e5e7eb"/>
-<text x="80.0" y="236.8" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">12,007.8</text>
+<text x="80.0" y="236.8" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">541.4</text>
 <line x1="90" y1="158.4" x2="830" y2="158.4" stroke="#e5e7eb"/>
-<text x="80.0" y="162.4" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">16,010.4</text>
+<text x="80.0" y="162.4" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">721.8</text>
 <line x1="90" y1="84.0" x2="830" y2="84.0" stroke="#e5e7eb"/>
-<text x="80.0" y="88.0" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">20,012.9</text>
+<text x="80.0" y="88.0" font-size="11" font-weight="400" text-anchor="end" fill="#1f2937">902.3</text>
 <text x="90.0" y="480.0" font-size="12" font-weight="400" text-anchor="middle" fill="#1f2937">8</text>
 <text x="336.7" y="480.0" font-size="12" font-weight="400" text-anchor="middle" fill="#1f2937">16</text>
 <text x="583.3" y="480.0" font-size="12" font-weight="400" text-anchor="middle" fill="#1f2937">32</text>
 <text x="830.0" y="480.0" font-size="12" font-weight="400" text-anchor="middle" fill="#1f2937">64</text>
-<polyline points="90.0,352.5 336.7,303.8 583.3,279.7 830.0,267.7" fill="none" stroke="#2563eb" stroke-width="2.5"/>
-<circle cx="90.0" cy="352.5" r="4.5" fill="#2563eb"/>
-<text x="90.0" y="370.5" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">443/278</text>
-<circle cx="336.7" cy="303.8" r="4.5" fill="#2563eb"/>
-<text x="336.7" y="321.8" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">944/409</text>
-<circle cx="583.3" cy="279.7" r="4.5" fill="#2563eb"/>
-<text x="583.3" y="297.7" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">1,195/474</text>
-<circle cx="830.0" cy="267.7" r="4.5" fill="#2563eb"/>
-<text x="830.0" y="285.7" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">1,320/506</text>
 <rect x="858" y="86" width="14" height="14" fill="#2563eb"/>
 <text x="880.0" y="98.0" font-size="12" font-weight="400" text-anchor="start" fill="#1f2937">No MTP</text>
-<polyline points="90.0,214.5 336.7,119.2 583.3,95.7 830.0,84.0" fill="none" stroke="#dc2626" stroke-width="2.5"/>
-<circle cx="90.0" cy="214.5" r="4.5" fill="#dc2626"/>
-<text x="90.0" y="202.5" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">443/443</text>
-<circle cx="336.7" cy="119.2" r="4.5" fill="#dc2626"/>
-<text x="336.7" y="107.2" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">944/906</text>
-<circle cx="583.3" cy="95.7" r="4.5" fill="#dc2626"/>
-<text x="583.3" y="83.7" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">1,195/969</text>
+<polyline points="583.3,381.7 830.0,84.0" fill="none" stroke="#dc2626" stroke-width="2.5"/>
+<circle cx="583.3" cy="381.7" r="4.5" fill="#dc2626"/>
+<text x="583.3" y="369.7" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">1,195/9</text>
 <circle cx="830.0" cy="84.0" r="4.5" fill="#dc2626"/>
-<text x="830.0" y="72.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">1,320/1,000</text>
+<text x="830.0" y="72.0" font-size="10" font-weight="400" text-anchor="middle" fill="#1f2937">1,320/45</text>
 <rect x="858" y="110" width="14" height="14" fill="#dc2626"/>
 <text x="880.0" y="122.0" font-size="12" font-weight="400" text-anchor="start" fill="#1f2937">MTP=1</text>
 </svg>
