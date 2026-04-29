@@ -140,11 +140,11 @@ def assert_op_valid(test_case, op):
     test_case.assertGreaterEqual(op.comm_time_s, 0, f"{op.name}: comm_time < 0")
     test_case.assertGreaterEqual(op.time_s, 0, f"{op.name}: time_s < 0")
 
-    compute = max(op.cube_time_s, op.vec_time_s, op.mem_time_s)
+    compute = max(op.cube_time_s + op.vec_time_s, op.mem_time_s)
     expected_total = compute + op.comm_time_s
     test_case.assertAlmostEqual(
         op.time_s, expected_total, places=12,
-        msg=f"{op.name}: time_s={op.time_s} != max(cube,vec,mem)+comm={expected_total}"
+        msg=f"{op.name}: time_s={op.time_s} != max(cube+vec,mem)+comm={expected_total}"
     )
 
     valid_bottlenecks = {"CUBE", "VEC", "MEM", "COMM", ""}

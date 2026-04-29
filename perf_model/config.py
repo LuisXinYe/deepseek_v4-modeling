@@ -1,5 +1,6 @@
 """Config dataclasses and JSON loader."""
 
+import dataclasses
 import json
 from decimal import Decimal, ROUND_CEILING
 from dataclasses import dataclass, field, fields as dataclass_fields
@@ -18,6 +19,15 @@ class HardwareConfig:
     vec_utilization: float | None = None
     hbm_bw_utilization: float = 0.8
     w8a8_tflops: float | None = None
+    prefill_utilization: float = 1.0
+    decode_utilization: float = 0.8
+    vec_static_latency_us: float = 10.0
+
+    def __post_init__(self):
+        if self.prefill_utilization <= 0:
+            raise ValueError(f"prefill_utilization must be positive, got {self.prefill_utilization}")
+        if self.decode_utilization <= 0:
+            raise ValueError(f"decode_utilization must be positive, got {self.decode_utilization}")
 
     @property
     def usable_hbm_capacity_gb(self) -> float:
@@ -165,6 +175,25 @@ class Config:
     net: NetworkConfig = field(default_factory=NetworkConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
     rt: RuntimeConfig = field(default_factory=RuntimeConfig)
+
+    def for_phase(self, phase: str | None) -> "Config":
+        """Return a copy of this config with utilizations scaled by the phase factor.
+
+        Applies the hardware's prefill or decode utilization multiplier to cube,
+        vec, and HBM bandwidth utilization. Returns self unchanged when phase is None.
+        Communication costs are not affected.
+        """
+        if phase is None:
+            return self
+        factor = (self.hw.prefill_utilization if phase == "prefill"
+                  else self.hw.decode_utilization)
+        scaled_hw = dataclasses.replace(
+            self.hw,
+            cube_utilization=self.hw.effective_cube_utilization * factor,
+            vec_utilization=self.hw.effective_vec_utilization * factor,
+            hbm_bw_utilization=self.hw.hbm_bw_utilization * factor,
+        )
+        return dataclasses.replace(self, hw=scaled_hw)
 
     @classmethod
     def from_json(cls, device_path: str, network_path: str,

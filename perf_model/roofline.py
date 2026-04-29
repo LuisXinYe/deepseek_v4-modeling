@@ -26,24 +26,32 @@ def roofline_time(name: str, flops: float, vec_ops: float, mem_bytes: float,
                   comm_bytes: float = 0.0) -> OpProfile:
     """Compute roofline time for an operation.
 
-    bottleneck = argmax(cube_time, vec_time, mem_time).
-    total time = max(cube, vec, mem) + comm.
+    Cube and vector execution are serial on the compute datapath:
+      compute_time = max(cube_time + vec_time, mem_time)
+      total_time   = compute_time + comm_time
     """
     cube_time = flops / (hw.cube_tflops * 1e12 * hw.effective_cube_utilization) if flops > 0 else 0.0
-    vec_time = vec_ops / (hw.vec_tflops * 1e12 * hw.effective_vec_utilization) if vec_ops > 0 else 0.0
+    if vec_ops > 0:
+        vec_time = (vec_ops / (hw.vec_tflops * 1e12 * hw.effective_vec_utilization)
+                    + hw.vec_static_latency_us * 1e-6)
+    else:
+        vec_time = 0.0
     mem_time = mem_bytes / (hw.hbm_bandwidth_gbps * 1e9 * hw.hbm_bw_utilization) if mem_bytes > 0 else 0.0
 
-    compute_time = max(cube_time, vec_time, mem_time)
-    if compute_time == 0.0 and comm_time_s == 0.0:
+    compute_side = cube_time + vec_time
+    compute_time = max(compute_side, mem_time)
+    total_time = compute_time + comm_time_s
+
+    if total_time == 0.0:
         bottleneck = ""
     elif comm_time_s > compute_time:
         bottleneck = "COMM"
-    elif cube_time >= vec_time and cube_time >= mem_time:
-        bottleneck = "CUBE"
-    elif vec_time >= mem_time:
-        bottleneck = "VEC"
-    else:
+    elif mem_time > compute_side:
         bottleneck = "MEM"
+    elif cube_time >= vec_time:
+        bottleneck = "CUBE"
+    else:
+        bottleneck = "VEC"
 
     return OpProfile(
         name=name,
@@ -55,7 +63,7 @@ def roofline_time(name: str, flops: float, vec_ops: float, mem_bytes: float,
         vec_time_s=vec_time,
         mem_time_s=mem_time,
         comm_time_s=comm_time_s,
-        time_s=compute_time + comm_time_s,
+        time_s=total_time,
         bottleneck=bottleneck,
     )
 
@@ -102,10 +110,17 @@ def sum_ops(ops: List[OpProfile], name: str) -> OpProfile:
         total.mem_time_s += op.mem_time_s
         total.comm_time_s += op.comm_time_s
         total.time_s += op.time_s
-    # Bottleneck for the aggregate = largest component
-    times = {"CUBE": total.cube_time_s, "VEC": total.vec_time_s,
-             "MEM": total.mem_time_s, "COMM": total.comm_time_s}
-    total.bottleneck = max(times, key=times.get) if total.time_s > 0 else ""
+    compute_side = total.cube_time_s + total.vec_time_s
+    if total.time_s == 0:
+        total.bottleneck = ""
+    elif total.comm_time_s > max(compute_side, total.mem_time_s):
+        total.bottleneck = "COMM"
+    elif total.mem_time_s > compute_side:
+        total.bottleneck = "MEM"
+    elif total.cube_time_s >= total.vec_time_s:
+        total.bottleneck = "CUBE"
+    else:
+        total.bottleneck = "VEC"
     return total
 
 

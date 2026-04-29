@@ -33,6 +33,9 @@ class TestHardwareConfig(unittest.TestCase):
         self.assertEqual(hw.effective_cube_utilization, 0.5)
         self.assertEqual(hw.effective_vec_utilization, 0.5)
         self.assertEqual(hw.hbm_bw_utilization, 0.8)
+        self.assertGreater(hw.prefill_utilization, 0)
+        self.assertGreater(hw.decode_utilization, 0)
+        self.assertGreaterEqual(hw.vec_static_latency_us, 0)
 
     def test_hardware_w8a8_default(self):
         hw = HardwareConfig()
@@ -66,6 +69,111 @@ class TestHardwareConfig(unittest.TestCase):
         hw = HardwareConfig(flops_utilization=0.6)
         self.assertEqual(hw.effective_cube_utilization, 0.6)
         self.assertEqual(hw.effective_vec_utilization, 0.6)
+
+
+class TestHardwareConfigPhaseFields(unittest.TestCase):
+    """prefill_utilization, decode_utilization, vec_static_latency_us."""
+
+    def test_new_field_defaults(self):
+        hw = HardwareConfig()
+        self.assertEqual(hw.prefill_utilization, 1.0)
+        self.assertEqual(hw.decode_utilization, 0.8)
+        self.assertEqual(hw.vec_static_latency_us, 10.0)
+
+    def test_custom_phase_fields(self):
+        hw = HardwareConfig(prefill_utilization=0.9, decode_utilization=0.7,
+                            vec_static_latency_us=5.0)
+        self.assertEqual(hw.prefill_utilization, 0.9)
+        self.assertEqual(hw.decode_utilization, 0.7)
+        self.assertEqual(hw.vec_static_latency_us, 5.0)
+
+    def test_above_one_utilization_is_valid(self):
+        hw = HardwareConfig(prefill_utilization=1.5, decode_utilization=2.0)
+        self.assertEqual(hw.prefill_utilization, 1.5)
+
+    def test_zero_prefill_utilization_raises(self):
+        with self.assertRaises(ValueError):
+            HardwareConfig(prefill_utilization=0)
+
+    def test_negative_prefill_utilization_raises(self):
+        with self.assertRaises(ValueError):
+            HardwareConfig(prefill_utilization=-0.1)
+
+    def test_zero_decode_utilization_raises(self):
+        with self.assertRaises(ValueError):
+            HardwareConfig(decode_utilization=0)
+
+    def test_negative_decode_utilization_raises(self):
+        with self.assertRaises(ValueError):
+            HardwareConfig(decode_utilization=-0.1)
+
+    def test_minimal_json_uses_defaults(self):
+        """A hardware JSON without new fields loads and resolves to positive defaults."""
+        import tempfile, json, os
+        with tempfile.TemporaryDirectory() as d:
+            hw_path = os.path.join(d, "hw_minimal.json")
+            with open(hw_path, "w") as f:
+                json.dump({"cube_tflops": 100, "vec_tflops": 10,
+                           "hbm_capacity_gb": 32, "hbm_bandwidth_gbps": 900,
+                           "hbm_reserved_pct": 10}, f)
+            with open(hw_path) as f:
+                hw = HardwareConfig(**json.load(f))
+            self.assertGreater(hw.prefill_utilization, 0)
+            self.assertGreater(hw.decode_utilization, 0)
+            self.assertGreaterEqual(hw.vec_static_latency_us, 0)
+
+
+class TestConfigForPhase(unittest.TestCase):
+    """Config.for_phase() applies phase utilization multipliers correctly."""
+
+    def setUp(self):
+        self.cfg = make_config(
+            prefill_utilization=0.9,
+            decode_utilization=0.75,
+            flops_utilization=0.5,
+            hbm_bw_utilization=0.8,
+        )
+
+    def test_for_phase_none_returns_self(self):
+        result = self.cfg.for_phase(None)
+        self.assertIs(result, self.cfg)
+
+    def test_for_phase_prefill_scales_utilizations(self):
+        scaled = self.cfg.for_phase("prefill")
+        factor = 0.9
+        self.assertAlmostEqual(scaled.hw.effective_cube_utilization,
+                               self.cfg.hw.effective_cube_utilization * factor)
+        self.assertAlmostEqual(scaled.hw.effective_vec_utilization,
+                               self.cfg.hw.effective_vec_utilization * factor)
+        self.assertAlmostEqual(scaled.hw.hbm_bw_utilization,
+                               self.cfg.hw.hbm_bw_utilization * factor)
+
+    def test_for_phase_decode_scales_utilizations(self):
+        scaled = self.cfg.for_phase("decode")
+        factor = 0.75
+        self.assertAlmostEqual(scaled.hw.effective_cube_utilization,
+                               self.cfg.hw.effective_cube_utilization * factor)
+        self.assertAlmostEqual(scaled.hw.effective_vec_utilization,
+                               self.cfg.hw.effective_vec_utilization * factor)
+        self.assertAlmostEqual(scaled.hw.hbm_bw_utilization,
+                               self.cfg.hw.hbm_bw_utilization * factor)
+
+    def test_for_phase_does_not_mutate_original(self):
+        original_cube_util = self.cfg.hw.effective_cube_utilization
+        _ = self.cfg.for_phase("prefill")
+        self.assertAlmostEqual(self.cfg.hw.effective_cube_utilization, original_cube_util)
+
+    def test_for_phase_prefill_util_1_is_identity_on_compute(self):
+        cfg = make_config(prefill_utilization=1.0)
+        scaled = cfg.for_phase("prefill")
+        self.assertAlmostEqual(scaled.hw.effective_cube_utilization,
+                               cfg.hw.effective_cube_utilization)
+
+    def test_for_phase_with_explicit_cube_utilization(self):
+        """for_phase uses effective_* (not raw cube_utilization which can be None)."""
+        cfg = make_config(cube_utilization=0.4, prefill_utilization=0.8)
+        scaled = cfg.for_phase("prefill")
+        self.assertAlmostEqual(scaled.hw.effective_cube_utilization, 0.4 * 0.8)
 
 
 class TestNetworkConfig(unittest.TestCase):

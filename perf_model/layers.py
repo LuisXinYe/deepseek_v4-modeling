@@ -265,6 +265,7 @@ class PhaseProfile:
 
 def prefill_model(cfg: Config) -> PhaseProfile:
     """Full prefill: Embedding + all layers + LM Head."""
+    cfg = cfg.for_phase("prefill")
     B = cfg.rt.batch_size // cfg.rt.dp
     S = cfg.rt.seq_len
     T_full = B * S
@@ -303,6 +304,7 @@ def prefill_model(cfg: Config) -> PhaseProfile:
 
 def decode_step(S_total: int, cfg: Config) -> PhaseProfile:
     """Single decode step at context length S_total."""
+    cfg = cfg.for_phase("decode")
     B = cfg.rt.batch_size // cfg.rt.dp
     T_full = B * 1
 

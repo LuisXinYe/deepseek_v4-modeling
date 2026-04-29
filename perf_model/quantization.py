@@ -87,6 +87,14 @@ def infer_op_kind(name: str) -> str:
     return "other"
 
 
+def _infer_phase(phase_name: str) -> str | None:
+    if phase_name == "prefill":
+        return "prefill"
+    if phase_name.startswith("decode"):
+        return "decode"
+    return None
+
+
 def _with_roofline_timings(
     op: OpProfile,
     cfg: Config,
@@ -97,20 +105,27 @@ def _with_roofline_timings(
     flops = op.flops
     vec_ops = op.vec_ops
     cube_time = flops / (cube_tflops * 1e12 * cfg.hw.effective_cube_utilization) if flops > 0 else 0.0
-    vec_time = vec_ops / (cfg.hw.vec_tflops * 1e12 * cfg.hw.effective_vec_utilization) if vec_ops > 0 else 0.0
+    if vec_ops > 0:
+        vec_time = (vec_ops / (cfg.hw.vec_tflops * 1e12 * cfg.hw.effective_vec_utilization)
+                    + cfg.hw.vec_static_latency_us * 1e-6)
+    else:
+        vec_time = 0.0
     mem_time = mem_bytes / (cfg.hw.hbm_bandwidth_gbps * 1e9 * cfg.hw.hbm_bw_utilization) if mem_bytes > 0 else 0.0
 
-    compute_time = max(cube_time, vec_time, mem_time)
-    if compute_time == 0.0 and comm_time_s == 0.0:
+    compute_side = cube_time + vec_time
+    compute_time = max(compute_side, mem_time)
+    total_time = compute_time + comm_time_s
+
+    if total_time == 0.0:
         bottleneck = ""
     elif comm_time_s > compute_time:
         bottleneck = "COMM"
-    elif cube_time >= vec_time and cube_time >= mem_time:
-        bottleneck = "CUBE"
-    elif vec_time >= mem_time:
-        bottleneck = "VEC"
-    else:
+    elif mem_time > compute_side:
         bottleneck = "MEM"
+    elif cube_time >= vec_time:
+        bottleneck = "CUBE"
+    else:
+        bottleneck = "VEC"
 
     return OpProfile(
         name=op.name,
@@ -122,7 +137,7 @@ def _with_roofline_timings(
         vec_time_s=vec_time,
         mem_time_s=mem_time,
         comm_time_s=comm_time_s,
-        time_s=compute_time + comm_time_s,
+        time_s=total_time,
         bottleneck=bottleneck,
     )
 
@@ -153,6 +168,7 @@ def quantize_op_profile(op: OpProfile, cfg: Config) -> OpProfile:
 def quantize_phase_profile(phase: PhaseProfile, cfg: Config) -> PhaseProfile:
     """Return a quantized copy of a phase profile with recomputed totals."""
     cfg.rt.validate_serving_fields()
+    cfg = cfg.for_phase(_infer_phase(phase.phase))
     layer_profiles = []
     original_detailed_total = 0.0
     quantized_detailed_total = 0.0

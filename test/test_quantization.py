@@ -1,14 +1,16 @@
 import unittest
 
 from test.helpers import make_config
+from perf_model.config import HardwareConfig
 from perf_model.layers import LayerProfile, PhaseProfile, decode_model
-from perf_model.roofline import OpProfile, sum_ops
+from perf_model.roofline import OpProfile, roofline_time, sum_ops
 from perf_model.quantization import (
     infer_op_kind,
     quantized_weight_memory_per_rank,
     quantized_kv_cache_memory,
     quantize_op_profile,
     quantize_phase_profile,
+    _with_roofline_timings,
 )
 
 
@@ -97,10 +99,9 @@ class TestQuantization(unittest.TestCase):
             q.cube_time_s,
             op.flops / (cfg.hw.cube_tflops * 1e12 * cfg.hw.effective_cube_utilization),
         )
-        self.assertAlmostEqual(
-            q.vec_time_s,
-            op.vec_ops / (cfg.hw.vec_tflops * 1e12 * cfg.hw.effective_vec_utilization),
-        )
+        expected_vec = (op.vec_ops / (cfg.hw.vec_tflops * 1e12 * cfg.hw.effective_vec_utilization)
+                        + cfg.hw.vec_static_latency_us * 1e-6)
+        self.assertAlmostEqual(q.vec_time_s, expected_vec)
 
     def test_phase_quantization_copies_and_recomputes_totals(self):
         cfg = make_config(quant_mode="w8a8", kv_cache_quant_mode="kv8")
@@ -150,6 +151,79 @@ class TestQuantization(unittest.TestCase):
         q_op = quantize_op_profile(op, cfg)
 
         self.assertEqual(q_op, op)
+
+
+class TestWithRooflineTimingsFormula(unittest.TestCase):
+    """_with_roofline_timings() must match roofline_time() formula exactly."""
+
+    def test_matches_roofline_time_for_cube_op(self):
+        hw = HardwareConfig(
+            cube_tflops=100, vec_tflops=10,
+            hbm_bandwidth_gbps=1000,
+            flops_utilization=0.5, hbm_bw_utilization=0.8,
+            vec_static_latency_us=5.0,
+        )
+        cfg = make_config(
+            cube_tflops=100, vec_tflops=10,
+            hbm_bandwidth_gbps=1000,
+            flops_utilization=0.5, hbm_bw_utilization=0.8,
+            vec_static_latency_us=5.0,
+        )
+        flops, vec_ops, mem_bytes = 1e12, 1e11, 1e9
+        op = OpProfile(name="test_op", flops=flops, vec_ops=vec_ops, mem_bytes=mem_bytes)
+        ref = roofline_time("test_op", flops=flops, vec_ops=vec_ops, mem_bytes=mem_bytes, hw=hw)
+        result = _with_roofline_timings(op, cfg, hw.cube_tflops, mem_bytes, 0.0)
+        self.assertAlmostEqual(result.time_s, ref.time_s, places=12)
+        self.assertAlmostEqual(result.cube_time_s, ref.cube_time_s, places=12)
+        self.assertAlmostEqual(result.vec_time_s, ref.vec_time_s, places=12)
+        self.assertAlmostEqual(result.mem_time_s, ref.mem_time_s, places=12)
+        self.assertEqual(result.bottleneck, ref.bottleneck)
+
+    def test_vec_static_not_added_when_vec_ops_zero(self):
+        cfg = make_config(vec_static_latency_us=10.0)
+        op = OpProfile(name="no_vec", flops=1e12, vec_ops=0, mem_bytes=1e9)
+        result = _with_roofline_timings(op, cfg, cfg.hw.cube_tflops, op.mem_bytes, 0.0)
+        self.assertEqual(result.vec_time_s, 0.0)
+
+
+class TestQuantizePhaseProfilePhaseContext(unittest.TestCase):
+    """quantize_phase_profile() applies phase utilization context."""
+
+    def test_prefill_phase_applies_prefill_utilization(self):
+        cfg_full = make_config(quant_mode="bf16", prefill_utilization=1.0)
+        cfg_low = make_config(quant_mode="bf16", prefill_utilization=0.5)
+        gemm = OpProfile(name="q_proj_dq", flops=1e12, mem_bytes=1e9)
+        layer = LayerProfile(layer_idx=0, ratio=1, ops=[gemm])
+        layer.total = sum_ops(layer.ops, "layer_0")
+        phase = PhaseProfile(
+            phase="prefill",
+            layer_profiles=[layer],
+            extra_ops=[],
+            total_time_s=layer.total.time_s,
+            total_tokens=2,
+        )
+        q_full = quantize_phase_profile(phase, cfg_full)
+        q_low = quantize_phase_profile(phase, cfg_low)
+        self.assertGreater(q_low.layer_profiles[0].ops[0].time_s,
+                           q_full.layer_profiles[0].ops[0].time_s)
+
+    def test_decode_phase_applies_decode_utilization(self):
+        cfg_full = make_config(quant_mode="bf16", decode_utilization=1.0)
+        cfg_low = make_config(quant_mode="bf16", decode_utilization=0.5)
+        gemm = OpProfile(name="q_proj_dq", flops=1e12, mem_bytes=1e9)
+        layer = LayerProfile(layer_idx=0, ratio=1, ops=[gemm])
+        layer.total = sum_ops(layer.ops, "layer_0")
+        phase = PhaseProfile(
+            phase="decode_step@512",
+            layer_profiles=[layer],
+            extra_ops=[],
+            total_time_s=layer.total.time_s,
+            total_tokens=1,
+        )
+        q_full = quantize_phase_profile(phase, cfg_full)
+        q_low = quantize_phase_profile(phase, cfg_low)
+        self.assertGreater(q_low.layer_profiles[0].ops[0].time_s,
+                           q_full.layer_profiles[0].ops[0].time_s)
 
 
 if __name__ == "__main__":
