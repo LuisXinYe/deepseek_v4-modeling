@@ -4,8 +4,10 @@
     "hbm_capacity_gb": 64,
     "hbm_reserved_pct": 10.0,
     "hbm_bandwidth_gbps": 1800,
-    "flops_utilization": 0.2,
-    "cube_utilization": 0.2,
-    "hbm_bw_utilization": 0.2,
-    "vec_utilization": 0.1
+    "cube_utilization": 0.3,
+    "hbm_bw_utilization": 0.1,
+    "vec_utilization": 0.1,
+    "prefill_utilization": 1,
+    "decode_utilization": 0.8,
+    "vec_static_latency_us": 10
 }
